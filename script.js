@@ -81,6 +81,9 @@
     this.pool = [];
     this.running = false;
     this.wheelTimer = 0;
+    this.side = el.getAttribute("data-side") === "right" ? "right" : "left";
+    this.hoverAbs = null;  // card under the mouse
+    this.dt = 16;
     this.measure();
     this.bind();
     this.render();
@@ -98,9 +101,18 @@
       this.cw = Math.min(this.W * 0.36, this.ch * 1.25);
       gap = this.W * 0.03;
     } else {
-      this.cw = (this.W / 2) * 0.80;   // the window is 2× wider than its visible half
-      this.ch = Math.min(this.H * 0.2, this.cw * 0.6);
-      gap = this.H * 0.03;
+      // Desktop: a wheel turning in the screen plane around the oval's centre
+      // (which sits on the screen edge). Cards travel along the arc.
+      var Wv = this.W / 2;                // visible half of the oval
+      this.cw = Wv * 0.78;
+      this.ch = Math.min(this.H * 0.18, this.cw * 0.58);
+      gap = this.H * 0.07;
+      this.rx = Wv * 0.52;                // path of card centres (ellipse)
+      this.ry = this.H * 0.45;
+      this.step = (this.ch + gap) / this.ry * 180 / Math.PI;
+      this.pxPerItem = this.ch + gap;
+      this.buildPool(Math.min(this.n, Math.floor(100 / this.step) * 2 + 3));
+      return;
     }
     this.P = len * 1.5;        // perspective (smaller = stronger 3D)
     this.R = len * 0.75;       // radius: front card at z = 0, edges reach the oval
@@ -117,14 +129,14 @@
     for (var s = 0; s < size; s++) {
       var c = document.createElement("div");
       c.className = "card";
-      c.innerHTML = '<img alt="" decoding="async" draggable="false"><div class="card__shade"></div><div class="card__label"></div>';
+      c.innerHTML = '<img alt="" decoding="async" draggable="false"><div class="card__shade"></div><div class="card__glow"></div><div class="card__label"></div>';
       c.style.width = this.cw + "px";
       c.style.height = this.ch + "px";
       c.style.marginLeft = (-this.cw / 2) + "px";
       c.style.marginTop = (-this.ch / 2) + "px";
       c._abs = null;
       this.track.appendChild(c);
-      this.pool.push({ el: c, img: c.firstChild, shade: c.children[1], label: c.children[2] });
+      this.pool.push({ el: c, img: c.firstChild, shade: c.children[1], glow: c.children[2], label: c.children[3], h: 0 });
     }
   };
 
@@ -141,6 +153,19 @@
     this.pool.forEach(function (s) { if (s.el._abs != null) self.fill(s, s.el._abs); });
   };
 
+  // smooth hover: returns true while any card is still easing
+  Drum.prototype.stepHover = function () {
+    var k = reduceMotion ? 1 : 1 - Math.exp(-this.dt / 70);
+    var moving = false;
+    for (var i = 0; i < this.pool.length; i++) {
+      var s = this.pool[i];
+      var tgt = (!this.dragging && this.hoverAbs !== null && s.el._abs === this.hoverAbs) ? 1 : 0;
+      s.h += (tgt - s.h) * k;
+      if (Math.abs(tgt - s.h) < 0.002) s.h = tgt; else moving = true;
+    }
+    return moving;
+  };
+
   Drum.prototype.render = function () {
     var size = this.pool.length;
     var base = Math.round(this.offset);
@@ -155,20 +180,36 @@
       var rel = abs - this.offset;
       var a = rel * this.step;
       var el = slot.el;
-      if (Math.abs(a) > 94) { el.style.visibility = "hidden"; continue; }
+      var lim = this.horizontal ? 94 : 100;
+      if (Math.abs(a) > lim) { el.style.visibility = "hidden"; continue; }
       if (el._abs !== abs) this.fill(slot, abs);
       var cos = Math.cos(a * Math.PI / 180);
       var near = clamp(1 - Math.abs(rel) * 1.6, 0, 1);       // 1 exactly on the line
-      var scale = 1 + near * 0.07;
-      var rot = this.horizontal ? "rotateY(" + a.toFixed(3) + "deg)" : "rotateX(" + (-a).toFixed(3) + "deg)";
+      var h = slot.h;                                          // hover 0..1
+      slot.glow.style.opacity = (h * 0.16).toFixed(3);
       el.style.visibility = "visible";
+      el.classList.toggle("is-selected", this.active && this.selected === abs);
+      if (!this.horizontal) {
+        var ar = a * Math.PI / 180;
+        var sgn = this.side === "left" ? 1 : -1;
+        var x = sgn * this.rx * Math.cos(ar);
+        var y = this.ry * Math.sin(ar);
+        var sc = (0.7 + 0.3 * cos) * (1 + near * 0.06) * (1 + h * 0.06);
+        el.style.transform = "translate3d(" + x.toFixed(2) + "px," + y.toFixed(2) + "px,0) rotate(" +
+          (sgn * a * 0.22).toFixed(3) + "deg) scale(" + sc.toFixed(4) + ")";
+        el.style.opacity = clamp(cos / 0.45, 0, 1).toFixed(3);
+        slot.shade.style.opacity = ((1 - cos) * 0.45 * (1 - h)).toFixed(3);
+        el.style.zIndex = Math.round(cos * 100) + 100 + Math.round(h * 60);
+        continue;
+      }
+      var scale = (1 + near * 0.07) * (1 + h * 0.06);
+      var rot = "rotateY(" + a.toFixed(3) + "deg)";
       el.style.transform =
         "perspective(" + this.P + "px) translateZ(" + (-this.R) + "px) " + rot +
         " translateZ(" + this.R + "px) scale(" + scale.toFixed(4) + ")";
       el.style.opacity = clamp((cos - 0.02) / 0.6, 0, 1).toFixed(3);
-      slot.shade.style.opacity = ((1 - cos) * 0.55).toFixed(3);
-      el.style.zIndex = Math.round(cos * 100) + 100;
-      el.classList.toggle("is-selected", this.active && this.selected === abs);
+      slot.shade.style.opacity = ((1 - cos) * 0.55 * (1 - h)).toFixed(3);
+      el.style.zIndex = Math.round(cos * 100) + 100 + Math.round(h * 60);
     }
     // hide slots that were not used this frame
     for (var s = 0; s < size; s++) if (!used[s]) this.pool[s].el.style.visibility = "hidden";
@@ -180,13 +221,15 @@
     var self = this, last = performance.now();
     function frame(now) {
       var dt = Math.min(64, now - last); last = now;
+      self.dt = dt;
+      var hovering = self.stepHover();
       if (!self.dragging) {
         var k = reduceMotion ? 1 : 1 - Math.exp(-dt / 90);
         self.offset += (self.target - self.offset) * k;
         if (Math.abs(self.target - self.offset) < 0.0008) self.offset = self.target;
       }
       self.render();
-      if (self.dragging || self.offset !== self.target) requestAnimationFrame(frame);
+      if (self.dragging || hovering || self.offset !== self.target) requestAnimationFrame(frame);
       else self.running = false;
     }
     requestAnimationFrame(frame);
@@ -233,6 +276,17 @@
       self.onInteract(self, dir);
       self.kick();
     }, { passive: false });
+
+    // Hover (mouse only): card gets lighter and a touch larger
+    this.track.addEventListener("pointerover", function (e) {
+      if (e.pointerType !== "mouse") return;
+      var card = e.target.closest && e.target.closest(".card");
+      var abs = card ? parseInt(card.getAttribute("data-abs"), 10) : null;
+      if (abs !== self.hoverAbs) { self.hoverAbs = abs; self.kick(); }
+    });
+    this.el.addEventListener("pointerleave", function () {
+      if (self.hoverAbs !== null) { self.hoverAbs = null; self.kick(); }
+    });
 
     // Pointer drag / swipe (mouse + touch) with fling
     var startPos = 0, startOff = 0, moved = 0, samples = [], pid = null, axisLocked = false;

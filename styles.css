@@ -133,8 +133,7 @@ html[dir="rtl"] .center { direction: rtl; }
 .drum--right .drum__window { left: 0; }
 .drum__track { position: absolute; inset: 0; }
 /* cards sit in the middle of the visible half */
-.drum--left .card { left: 75%; }
-.drum--right .card { left: 25%; }
+/* the card path is computed in script.js around the oval centre */
 .drum__fade {
   position: absolute; inset: 0; pointer-events: none; z-index: 500;
   background:
@@ -156,6 +155,7 @@ html[dir="rtl"] .center { direction: rtl; }
 }
 .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .card__shade { position: absolute; inset: 0; background: #0d0d0d; pointer-events: none; }
+.card__glow { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 .card__label {
   position: absolute; inset: auto 0 0 0;
   padding: 22px 12px 9px;
