@@ -327,9 +327,9 @@ html[dir="rtl"] .link-btn span[aria-hidden] { display: inline-block; transform: 
 }
 
 /* ---------- Phone & tablet portrait ----------
-   Same idea turned 90°: one big half-oval peeks from the top, the other
-   from the bottom, cards travel along the arc (swipe left/right),
-   the project sits in between. Keep this query in sync with script.js. */
+   Same layout as desktop: half-ovals on the left and right edges, just
+   narrower; the project sits in the column between them.
+   Keep this query in sync with script.js (mqCompact). */
 @media (max-width: 560px), (orientation: portrait) and (max-width: 1200px) {
   :root { --header-h: 64px; }
   .brand__logo { height: 36px; }
@@ -340,35 +340,21 @@ html[dir="rtl"] .link-btn span[aria-hidden] { display: inline-block; transform: 
   .header__actions { gap: 6px; }
 
   .hero {
-    --drum-v: clamp(128px, 21svh, 300px);         /* visible depth of each half-oval */
-    height: calc(100svh - var(--header-h));
-    grid-template-columns: 1fr;
-    grid-template-rows: var(--drum-v) minmax(0, 1fr) var(--drum-v);
-    grid-template-areas: "left" "center" "right";
-    gap: 8px;
-    padding: 0;
-    direction: ltr;
+    --drum-w: clamp(92px, 26vw, 300px);
+    --drum-h: calc(100svh - var(--header-h) - 16px);
+    gap: 10px;
+    padding-bottom: 16px;
   }
-  .drum { width: 100%; height: var(--drum-v); touch-action: pan-y; }
-  .drum .drum__window { width: 124%; left: -12%; height: 200%; }
-  .drum--left .drum__window { top: -100%; }
-  .drum--right .drum__window { top: 0; }
-  .drum__fade, .drum--h .drum__fade {
-    background: linear-gradient(to right, var(--oval) 0%, rgba(243,242,239,0) 22%, rgba(243,242,239,0) 78%, var(--oval) 100%);
-  }
-  .drum--left { transform: translate3d(0, calc(var(--out, 0) * -96%), 0); }
-  .drum--right { transform: translate3d(0, calc(var(--out, 0) * 96%), 0); }
-  .hero .drum--right .card__label { text-align: left; }
-  .card__label { font-size: 11px; padding: 16px 8px 6px; }
+  .card__label { font-size: 11px; padding: 14px 7px 6px; }
 
-  .center { padding: 4px 20px; align-items: stretch; }
+  .center { padding: 4px 0; align-items: stretch; }
   .stage { max-width: 640px; margin: 0 auto; height: 100%; }
   /* the project panel fills the space between the ovals; the photo takes what is left */
   .panel--project { display: flex; flex-direction: column; justify-content: center; height: 100%; min-height: 0; }
-  .panel--project .gallery { flex: 1 1 0; min-height: 64px; max-height: 40svh; display: flex; }
+  .panel--project .gallery { flex: 1 1 0; min-height: 64px; max-height: 30svh; display: flex; }
   .panel--project .gallery__main { flex: 1; height: auto; }
   .eyebrow { font-size: 10.5px; letter-spacing: .12em; margin-bottom: 10px; }
-  .welcome__title { font-size: clamp(26px, 7.4vw, 44px); }
+  .welcome__title { font-size: clamp(20px, 5.6vw, 44px); line-height: 1.1; }
   .welcome__founded { margin-top: 10px; font-size: 13px; }
   .welcome__text { margin-top: 12px; font-size: 14px; line-height: 1.5; }
   .welcome__hint { margin-top: 16px; font-size: 12px; }
@@ -379,8 +365,8 @@ html[dir="rtl"] .link-btn span[aria-hidden] { display: inline-block; transform: 
   .gallery__thumbs { display: none; }
   .project__head { margin-top: 10px; }
   .chip { padding: 4px 10px; font-size: 11px; }
-  .project__title { margin-top: 6px; font-size: clamp(20px, 5.6vw, 32px); }
-  .meta { margin-top: 8px; padding-top: 8px; gap: 18px; }
+  .project__title { margin-top: 6px; font-size: clamp(17px, 4.6vw, 32px); line-height: 1.15; }
+  .meta { margin-top: 8px; padding-top: 8px; gap: 6px 14px; flex-wrap: wrap; }
   .meta dt { font-size: 10px; }
   .meta dd { font-size: 13px; }
   .project__desc {
@@ -395,7 +381,7 @@ html[dir="rtl"] .link-btn span[aria-hidden] { display: inline-block; transform: 
 @media (max-height: 720px) and (orientation: portrait) {
   .hero { --drum-v: clamp(118px, 19svh, 200px); }
   .eyebrow { display: none; }
-  .welcome__title { font-size: 26px; }
+  .welcome__title { font-size: 20px; }
   .welcome__text { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .welcome__hint { margin-top: 10px; }
   .project__desc { -webkit-line-clamp: 1; }

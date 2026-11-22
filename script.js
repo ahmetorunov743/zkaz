@@ -98,7 +98,8 @@
     var r = this.win.getBoundingClientRect();
     this.W = r.width; this.H = r.height;
     var elW = this.el.clientWidth, elH = this.el.clientHeight;
-    this.horizontal = mqMobile.matches;            // cards move left/right
+    this.horizontal = false;                       // always left/right ovals, cards move up/down
+    var compact = mqMobile.matches;                // phones & portrait tablets: narrow ovals
     this.el.classList.toggle("drum--h", this.horizontal);
     this.edge = this.horizontal ? (this.side === "left" ? "top" : "bottom") : this.side;
 
@@ -111,8 +112,8 @@
       this.rPath = radialLen * 0.5;
       this.mPath = motionLen * 0.52;
     } else {
-      c = Math.min(motionLen * 0.19, radialLen * 0.46);   // square cards
-      gap = motionLen * 0.045;
+      c = Math.min(motionLen * (compact ? 0.15 : 0.19), radialLen * (compact ? 0.74 : 0.46));   // square cards
+      gap = motionLen * (compact ? 0.035 : 0.045);
       this.rPath = radialLen * 0.5;
       this.mPath = motionLen * 0.37;
     }
@@ -128,7 +129,7 @@
   Drum.prototype.placeTicks = function (elW, elH, c) {
     var ticks = this.el.querySelectorAll(".drum__tick");
     if (ticks.length < 2) return;
-    var L = Math.round(clamp(c * 0.12, 12, 22)), ext = c * 0.53 + 10;
+    var L = Math.round(clamp(c * 0.12, 8, 22)), ext = c * 0.53 + (c < 100 ? 4 : 10);
     var cx, cy;
     if (this.edge === "left")  { cx = this.rPath; cy = elH / 2; }
     if (this.edge === "right") { cx = elW - this.rPath; cy = elH / 2; }
@@ -141,7 +142,7 @@
       set(ticks[0], cx - 0.5, cy - ext - L, 1, L);
       set(ticks[1], cx - 0.5, cy + ext, 1, L);
     } else {
-      set(ticks[0], cx - ext - L, cy - 0.5, L, 1);
+      set(ticks[0], Math.max(2, cx - ext - L), cy - 0.5, L, 1);
       set(ticks[1], cx + ext, cy - 0.5, L, 1);
     }
   };
@@ -434,7 +435,7 @@
 
   function swap(nextEl, dir) {
     // dir: +1 down/right, -1 up/left (screen direction of the motion)
-    var horizontal = mqMobile.matches;
+    var horizontal = false;
     var dist = horizontal ? 40 : 56;
     var tr = function (v) { return horizontal ? "translateX(" + v + "px)" : "translateY(" + v + "px)"; };
     if (document.documentElement.dir === "rtl" && horizontal) dir = -dir;
