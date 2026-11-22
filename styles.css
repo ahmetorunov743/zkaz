@@ -45,6 +45,7 @@ button { font: inherit; color: inherit; }
 /* ---------- Header ---------- */
 .site-header {
   position: relative; z-index: 20;
+  background: var(--bg);
   height: var(--header-h);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 var(--gutter);
@@ -85,7 +86,6 @@ button { font: inherit; color: inherit; }
   direction: ltr;
   position: relative;
   height: calc(100svh - var(--header-h));
-  min-height: 560px;
   display: grid;
   grid-template-columns: var(--drum-w) 1fr var(--drum-w);
   grid-template-areas: "left center right";
@@ -160,6 +160,7 @@ html[dir="rtl"] .center { direction: rtl; }
 }
 .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .card__shade { position: absolute; inset: 0; background: #0d0d0d; pointer-events: none; }
+.drum--small .card__label { display: none; }
 .card__glow { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 .card__label {
   position: absolute; inset: auto 0 0 0;
@@ -177,21 +178,13 @@ html[dir="rtl"] .center { direction: rtl; }
 }
 .card.is-selected::after { box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3px var(--accent); }
 
-.drum__pointer {
-  position: absolute; z-index: 2; pointer-events: none;
-  top: 50%; left: 0; right: -18px; height: 1px;
-  background: linear-gradient(to right, transparent, var(--line-strong) 12%, var(--line-strong) 88%, transparent);
+/* two short, faint ticks on both sides of the selected slot (placed by script.js) */
+.drum__tick {
+  position: absolute; z-index: 3; pointer-events: none;
+  background: rgba(20, 20, 20, .22); border-radius: 1px;
+  transition: background .4s var(--ease);
 }
-.drum__pointer::before, .drum__pointer::after {
-  content: ""; position: absolute; top: -3px; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--ink);
-}
-.drum__pointer::before { left: 4px; }
-.drum__pointer::after { right: 4px; }
-.drum--right .drum__pointer { left: -18px; right: 0; }
-.drum--left .drum__pointer::before, .drum--right .drum__pointer::after { display: none; }
-.drum.is-active .drum__pointer::before,
-.drum.is-active .drum__pointer::after { background: var(--accent); }
+.drum.is-active .drum__tick { background: rgba(168, 139, 92, .6); }
 
 /* ---------- Center ---------- */
 .center {
@@ -333,48 +326,94 @@ html[dir="rtl"] .link-btn span[aria-hidden] { display: inline-block; transform: 
   .gallery__thumbs button { width: 52px; height: 38px; }
 }
 
-/* ---------- Phone: two horizontal drums on top, info below ---------- */
-@media (max-width: 820px) {
-  :root { --header-h: 68px; }
-  .brand__logo { height: 38px; }
-  .lang__btn { padding: 5px 8px; }
-  .icon-btn { width: 36px; height: 36px; }
+/* ---------- Phone & tablet portrait ----------
+   Same idea turned 90°: one big half-oval peeks from the top, the other
+   from the bottom, cards travel along the arc (swipe left/right),
+   the project sits in between. Keep this query in sync with script.js. */
+@media (max-width: 560px), (orientation: portrait) and (max-width: 1200px) {
+  :root { --header-h: 64px; }
+  .brand__logo { height: 36px; }
+  .lang { margin-inline-end: 2px; }
+  .lang__btn { padding: 5px 8px; font-size: 11px; }
+  .icon-btn { width: 34px; height: 34px; }
+  .icon-btn svg { width: 16px; height: 16px; }
   .header__actions { gap: 6px; }
 
-  .scene { height: auto; }
-  .scene__sticky { position: static; height: auto; overflow: visible; }
-  .drum--left, .drum--right { transform: none; }
-  .hero .center { opacity: 1; }
   .hero {
-    height: auto; min-height: 0;
+    --drum-v: clamp(128px, 21svh, 300px);         /* visible depth of each half-oval */
+    height: calc(100svh - var(--header-h));
     grid-template-columns: 1fr;
-    grid-template-areas: "left" "right" "center";
-    gap: 14px;
-    padding: 4px 16px 48px;
-    direction: inherit;
+    grid-template-rows: var(--drum-v) minmax(0, 1fr) var(--drum-v);
+    grid-template-areas: "left" "center" "right";
+    gap: 8px;
+    padding: 0;
+    direction: ltr;
   }
-  .drum { width: 100%; height: clamp(140px, 22svh, 190px); touch-action: pan-y; }
-  .drum .drum__window { left: 0; width: 100%; }
-  .drum .card { left: 50%; }
-  .drum--left .drum__pointer::before, .drum--right .drum__pointer::after { display: block; }
-  .drum--left .drum__pointer, .drum--right .drum__pointer { left: 50%; right: auto; }
-  .drum__pointer {
-    top: -10px; bottom: -10px; left: 50%; right: auto; width: 1px; height: auto;
-    background: linear-gradient(to bottom, transparent, var(--line-strong) 15%, var(--line-strong) 85%, transparent);
+  .drum { width: 100%; height: var(--drum-v); touch-action: pan-y; }
+  .drum .drum__window { width: 124%; left: -12%; height: 200%; }
+  .drum--left .drum__window { top: -100%; }
+  .drum--right .drum__window { top: 0; }
+  .drum__fade, .drum--h .drum__fade {
+    background: linear-gradient(to right, var(--oval) 0%, rgba(243,242,239,0) 22%, rgba(243,242,239,0) 78%, var(--oval) 100%);
   }
-  .drum__pointer::before, .drum__pointer::after { left: -3px; right: auto; }
-  .drum__pointer::before { top: 4px; }
-  .drum__pointer::after { top: auto; bottom: 4px; }
+  .drum--left { transform: translate3d(0, calc(var(--out, 0) * -96%), 0); }
+  .drum--right { transform: translate3d(0, calc(var(--out, 0) * 96%), 0); }
+  .hero .drum--right .card__label { text-align: left; }
   .card__label { font-size: 11px; padding: 16px 8px 6px; }
 
-  .center { overflow: visible; padding-top: 18px; }
-  .stage { max-width: none; }
-  .welcome__hint { margin-top: 28px; }
-  .welcome__title { font-size: 32px; }
-  .eyebrow { font-size: 11px; letter-spacing: .12em; }
-  .gallery__main { max-height: none; border-radius: var(--radius-m); }
-  .meta { flex-wrap: wrap; }
-  .footer__inner { grid-template-columns: 1fr; gap: 32px; }
+  .center { padding: 4px 20px; align-items: stretch; }
+  .stage { max-width: 640px; margin: 0 auto; height: 100%; }
+  /* the project panel fills the space between the ovals; the photo takes what is left */
+  .panel--project { display: flex; flex-direction: column; justify-content: center; height: 100%; min-height: 0; }
+  .panel--project .gallery { flex: 1 1 0; min-height: 64px; max-height: 40svh; display: flex; }
+  .panel--project .gallery__main { flex: 1; height: auto; }
+  .eyebrow { font-size: 10.5px; letter-spacing: .12em; margin-bottom: 10px; }
+  .welcome__title { font-size: clamp(26px, 7.4vw, 44px); }
+  .welcome__founded { margin-top: 10px; font-size: 13px; }
+  .welcome__text { margin-top: 12px; font-size: 14px; line-height: 1.5; }
+  .welcome__hint { margin-top: 16px; font-size: 12px; }
+  .hint-icon { display: none; }
+
+  /* compact project card so it fits between the ovals */
+  .gallery__main { aspect-ratio: auto; max-height: none; border-radius: var(--radius-m); }
+  .gallery__thumbs { display: none; }
+  .project__head { margin-top: 10px; }
+  .chip { padding: 4px 10px; font-size: 11px; }
+  .project__title { margin-top: 6px; font-size: clamp(20px, 5.6vw, 32px); }
+  .meta { margin-top: 8px; padding-top: 8px; gap: 18px; }
+  .meta dt { font-size: 10px; }
+  .meta dd { font-size: 13px; }
+  .project__desc {
+    margin-top: 6px; font-size: 13px; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .link-btn { margin-top: 4px; padding: 4px 0; font-size: 12px; align-self: flex-start; }
+  .footer__inner { grid-template-columns: 1fr; gap: 28px; }
+}
+
+/* short phones (iPhone SE & co.) */
+@media (max-height: 720px) and (orientation: portrait) {
+  .hero { --drum-v: clamp(118px, 19svh, 200px); }
+  .eyebrow { display: none; }
+  .welcome__title { font-size: 26px; }
+  .welcome__text { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .welcome__hint { margin-top: 10px; }
+  .project__desc { -webkit-line-clamp: 1; }
+}
+
+/* very short screens (phones in landscape, small laptops) */
+@media (max-height: 560px) and (orientation: landscape) {
+  :root { --header-h: 56px; }
+  .brand__logo { height: 32px; }
+  .hero { padding-bottom: 10px; }
+  .welcome__title { font-size: 28px; }
+  .welcome__text { font-size: 13px; margin-top: 10px; }
+  .welcome__hint { display: none; }
+  .gallery__main { max-height: 34svh; }
+  .gallery__thumbs, .project__desc, .link-btn { display: none; }
+  .project__head { margin-top: 8px; }
+  .project__title { font-size: 20px; margin-top: 4px; }
+  .meta { margin-top: 6px; padding-top: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -382,6 +421,4 @@ html[dir="rtl"] .link-btn span[aria-hidden] { display: inline-block; transform: 
 }
 
 /* labels sit on the side facing the screen edge, away from the oval's curve */
-@media (min-width: 821px) {
-  .drum--right .card__label { text-align: right; }
-}
+.drum--right .card__label { text-align: right; }

@@ -61,11 +61,12 @@
   var mod = function (a, n) { return ((a % n) + n) % n; };
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var mqMobile = window.matchMedia("(max-width: 820px)");
+  // keep in sync with the phone / portrait-tablet media query in styles.css
+  var mqMobile = window.matchMedia("(max-width: 560px), (orientation: portrait) and (max-width: 1200px)");
   var sceneOut = 0;   // 0 = drums in place, 1 = drums pushed out (scroll-linked)
 
   /* =====================================================================
-     Drum — virtualised 3D wheel (CSS transforms only)
+     Drum — virtualised wheel (CSS transforms only)
      Only ~10–14 card nodes exist per drum, whatever the project count.
      ===================================================================== */
   function Drum(el, items, onInteract) {
@@ -90,38 +91,59 @@
     this.render();
   }
 
+  /* Geometry: each drum is a big oval whose centre sits on a screen edge
+     (left/right on wide screens, top/bottom on phones and portrait tablets).
+     Only the inner half is visible; cards travel along the arc around that centre. */
   Drum.prototype.measure = function () {
     var r = this.win.getBoundingClientRect();
     this.W = r.width; this.H = r.height;
-    this.horizontal = mqMobile.matches;
+    var elW = this.el.clientWidth, elH = this.el.clientHeight;
+    this.horizontal = mqMobile.matches;            // cards move left/right
     this.el.classList.toggle("drum--h", this.horizontal);
-    var len = this.horizontal ? this.W : this.H;   // length along the rotation
-    var gap;
+    this.edge = this.horizontal ? (this.side === "left" ? "top" : "bottom") : this.side;
+
+    var radialLen = this.horizontal ? elH : elW;   // visible depth of the half-oval
+    var motionLen = this.horizontal ? elW : elH;   // length along the motion
+    var c, gap;
     if (this.horizontal) {
-      this.ch = this.H * 0.68;
-      this.cw = Math.min(this.W * 0.36, this.ch * 1.25);
-      gap = this.W * 0.03;
+      c = Math.min(motionLen * 0.30, radialLen * 0.62);
+      gap = motionLen * 0.04;
+      this.rPath = radialLen * 0.5;
+      this.mPath = motionLen * 0.52;
     } else {
-      // Desktop: a wheel turning in the screen plane around the oval's centre
-      // (which sits on the screen edge). Cards travel along the arc.
-      var Wv = this.W / 2;                // visible half of the oval
-      // square cards: no corners sticking out of the oval
-      this.cw = this.ch = Math.min(this.H * 0.19, Wv * 0.46);
-      gap = this.H * 0.045;
-      this.rx = Wv * 0.5;                 // path of card centres (ellipse)
-      this.ry = this.H * 0.37;
-      this.step = (this.ch + gap) / this.ry * 180 / Math.PI;
-      this.pxPerItem = this.ch + gap;
-      this.buildPool(Math.min(this.n, Math.floor(100 / this.step) * 2 + 3));
-      return;
+      c = Math.min(motionLen * 0.19, radialLen * 0.46);   // square cards
+      gap = motionLen * 0.045;
+      this.rPath = radialLen * 0.5;
+      this.mPath = motionLen * 0.37;
     }
-    this.P = len * 1.5;        // perspective (smaller = stronger 3D)
-    this.R = len * 0.75;       // radius: front card at z = 0, edges reach the oval
-    var half = ((this.horizontal ? this.cw : this.ch) + gap) / 2;
-    this.step = 2 * Math.asin(clamp(half / this.R, 0, 0.99)) * 180 / Math.PI;
-    this.pxPerItem = this.R * Math.sin(this.step * Math.PI / 180);
-    var slots = Math.min(this.n, Math.floor(96 / this.step) * 2 + 3);
-    this.buildPool(slots);
+    this.cw = this.ch = c;
+    this.el.classList.toggle("drum--small", c < 70);   // too small for a caption
+    this.step = (c + gap) / this.mPath * 180 / Math.PI;
+    this.pxPerItem = c + gap;
+    this.buildPool(Math.min(this.n, Math.floor(100 / this.step) * 2 + 3));
+    this.placeTicks(elW, elH, c);
+  };
+
+  // two short faint ticks on both sides of the selected slot
+  Drum.prototype.placeTicks = function (elW, elH, c) {
+    var ticks = this.el.querySelectorAll(".drum__tick");
+    if (ticks.length < 2) return;
+    var L = Math.round(clamp(c * 0.12, 12, 22)), ext = c * 0.53 + 10;
+    var cx, cy;
+    if (this.edge === "left")  { cx = this.rPath; cy = elH / 2; }
+    if (this.edge === "right") { cx = elW - this.rPath; cy = elH / 2; }
+    if (this.edge === "top")   { cx = elW / 2; cy = this.rPath; }
+    if (this.edge === "bottom"){ cx = elW / 2; cy = elH - this.rPath; }
+    var set = function (el, x, y, w, h) {
+      el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = w + "px"; el.style.height = h + "px";
+    };
+    if (this.horizontal) {
+      set(ticks[0], cx - 0.5, cy - ext - L, 1, L);
+      set(ticks[1], cx - 0.5, cy + ext, 1, L);
+    } else {
+      set(ticks[0], cx - ext - L, cy - 0.5, L, 1);
+      set(ticks[1], cx + ext, cy - 0.5, L, 1);
+    }
   };
 
   Drum.prototype.buildPool = function (size) {
@@ -181,8 +203,7 @@
       var rel = abs - this.offset;
       var a = rel * this.step;
       var el = slot.el;
-      var lim = this.horizontal ? 94 : 100;
-      if (Math.abs(a) > lim) { el.style.visibility = "hidden"; continue; }
+      if (Math.abs(a) > 100) { el.style.visibility = "hidden"; continue; }
       if (el._abs !== abs) this.fill(slot, abs);
       var cos = Math.cos(a * Math.PI / 180);
       var near = clamp(1 - Math.abs(rel) * 1.6, 0, 1);       // 1 exactly on the line
@@ -190,26 +211,18 @@
       slot.glow.style.opacity = (h * 0.16).toFixed(3);
       el.style.visibility = "visible";
       el.classList.toggle("is-selected", this.active && this.selected === abs);
-      if (!this.horizontal) {
-        var ar = a * Math.PI / 180;
-        var sgn = this.side === "left" ? 1 : -1;
-        var x = sgn * this.rx * Math.cos(ar);
-        var y = this.ry * Math.sin(ar);
-        var sc = (0.72 + 0.28 * cos) * (1 + near * 0.06) * (1 + h * 0.06);
-        el.style.transform = "translate3d(" + x.toFixed(2) + "px," + y.toFixed(2) + "px,0) rotate(" +
-          (sgn * a * 0.22).toFixed(3) + "deg) scale(" + sc.toFixed(4) + ")";
-        el.style.opacity = clamp((cos - 0.12) / 0.4, 0, 1).toFixed(3);
-        slot.shade.style.opacity = ((1 - cos) * 0.45 * (1 - h)).toFixed(3);
-        el.style.zIndex = Math.round(cos * 100) + 100 + Math.round(h * 60);
-        continue;
-      }
-      var scale = (1 + near * 0.07) * (1 + h * 0.06);
-      var rot = "rotateY(" + a.toFixed(3) + "deg)";
-      el.style.transform =
-        "perspective(" + this.P + "px) translateZ(" + (-this.R) + "px) " + rot +
-        " translateZ(" + this.R + "px) scale(" + scale.toFixed(4) + ")";
-      el.style.opacity = clamp((cos - 0.02) / 0.6, 0, 1).toFixed(3);
-      slot.shade.style.opacity = ((1 - cos) * 0.55 * (1 - h)).toFixed(3);
+      var ar = a * Math.PI / 180;
+      var rr = this.rPath * Math.cos(ar), mm = this.mPath * Math.sin(ar);
+      var x, y, rot;
+      if (this.edge === "left")   { x = rr;  y = mm;  rot = a; }
+      if (this.edge === "right")  { x = -rr; y = mm;  rot = -a; }
+      if (this.edge === "top")    { x = mm;  y = rr;  rot = -a; }
+      if (this.edge === "bottom") { x = mm;  y = -rr; rot = a; }
+      var sc = (0.72 + 0.28 * cos) * (1 + near * 0.06) * (1 + h * 0.06);
+      el.style.transform = "translate3d(" + x.toFixed(2) + "px," + y.toFixed(2) + "px,0) rotate(" +
+        (rot * 0.22).toFixed(3) + "deg) scale(" + sc.toFixed(4) + ")";
+      el.style.opacity = clamp((cos - 0.12) / 0.4, 0, 1).toFixed(3);
+      slot.shade.style.opacity = ((1 - cos) * 0.45 * (1 - h)).toFixed(3);
       el.style.zIndex = Math.round(cos * 100) + 100 + Math.round(h * 60);
     }
     // hide slots that were not used this frame
@@ -505,7 +518,6 @@
   var scrollTick = false;
   function onScroll() {
     scrollTick = false;
-    if (mqMobile.matches) { sceneOut = 0; hero.style.removeProperty("--out"); return; }
     var travel = scene.offsetHeight - window.innerHeight;
     sceneOut = travel > 0 ? clamp(window.scrollY / travel, 0, 1) : 0;
     hero.style.setProperty("--out", sceneOut.toFixed(4));
