@@ -98,8 +98,8 @@
       this.cw = Math.min(this.W * 0.36, this.ch * 1.25);
       gap = this.W * 0.03;
     } else {
-      this.cw = this.W * 0.80;
-      this.ch = Math.min(this.H * 0.165, this.cw * 0.64);
+      this.cw = (this.W / 2) * 0.80;   // the window is 2× wider than its visible half
+      this.ch = Math.min(this.H * 0.2, this.cw * 0.6);
       gap = this.H * 0.03;
     }
     this.P = len * 1.5;        // perspective (smaller = stronger 3D)
