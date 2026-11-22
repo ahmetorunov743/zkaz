@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4f2"/><stop offset="1" stop-color="#e4e4e1"/></linearGradient>
+<linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3b5b1"/><stop offset="1" stop-color="#cfd0cc"/></linearGradient>
+<radialGradient id="g" cx="0.63" cy="0.45" r="0.6"><stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="1200" height="800" fill="#cfd0cc"/>
+<polygon points="0,0 1200,0 943,201 472,201" fill="#f4f4f2"/>
+<polygon points="0,800 1200,800 943,503 472,503" fill="url(#f)"/>
+<polygon points="0,0 472,201 472,503 0,800" fill="#cfd0cc"/>
+<polygon points="1200,0 943,201 943,503 1200,800" fill="#e4e4e1" opacity="0.85"/>
+<rect x="472" y="201" width="471" height="302" fill="url(#w)"/>
+<rect x="704" y="231" width="101" height="242" rx="6" fill="#ffffff" opacity="0.75"/>
+<line x1="707" y1="352" x2="-600" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="-428" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="-257" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="-85" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="85" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="257" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="428" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="600" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="771" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="942" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="1114" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="1285" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="1457" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="1628" y2="800" stroke="#000" stroke-opacity="0.045"/><line x1="707" y1="352" x2="1800" y2="800" stroke="#000" stroke-opacity="0.045"/><path d="M898 718 q 101 32 381 -19" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1" fill="none"/><path d="M6 590 q 231 55 538 -22" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2" fill="none"/><path d="M1170 755 q 248 59 479 -21" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2" fill="none"/><path d="M1072 580 q 85 -59 352 27" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2" fill="none"/><path d="M235 735 q 129 45 408 -37" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5" fill="none"/>
+<rect width="1200" height="800" fill="url(#g)"/>
+<text x="40" y="764" font-family="Helvetica, Arial, sans-serif" font-size="22" letter-spacing="4" fill="#000" fill-opacity="0.28">NXT · PHOTO PLACEHOLDER 08</text>
+</svg>

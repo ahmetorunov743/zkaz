@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f5f0"/><stop offset="1" stop-color="#e3e6de"/></linearGradient>
+<linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aab3a1"/><stop offset="1" stop-color="#cbd1c4"/></linearGradient>
+<radialGradient id="g" cx="0.47" cy="0.45" r="0.6"><stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="1200" height="800" fill="#cbd1c4"/>
+<polygon points="0,0 1200,0 900,206 439,206" fill="#f3f5f0"/>
+<polygon points="0,800 1200,800 900,516 439,516" fill="url(#f)"/>
+<polygon points="0,0 439,206 439,516 0,800" fill="#cbd1c4"/>
+<polygon points="1200,0 900,206 900,516 1200,800" fill="#e3e6de" opacity="0.85"/>
+<rect x="439" y="206" width="461" height="310" fill="url(#w)"/>
+<rect x="489" y="236" width="153" height="250" rx="6" fill="#ffffff" opacity="0.75"/>
+<path d="M290 755 q 182 10 442 -23" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5" fill="none"/><path d="M1076 668 q 260 -7 483 8" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1" fill="none"/><path d="M259 568 q 125 -41 418 -11" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1" fill="none"/><path d="M943 619 q 147 -24 302 -22" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5" fill="none"/><path d="M1044 715 q 236 12 463 -24" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2" fill="none"/>
+<rect width="1200" height="800" fill="url(#g)"/>
+<text x="40" y="764" font-family="Helvetica, Arial, sans-serif" font-size="22" letter-spacing="4" fill="#000" fill-opacity="0.28">NXT · PHOTO PLACEHOLDER 04</text>
+</svg>
