@@ -62,6 +62,7 @@
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var mqMobile = window.matchMedia("(max-width: 820px)");
+  var sceneOut = 0;   // 0 = drums in place, 1 = drums pushed out (scroll-linked)
 
   /* =====================================================================
      Drum — virtualised 3D wheel (CSS transforms only)
@@ -104,11 +105,11 @@
       // Desktop: a wheel turning in the screen plane around the oval's centre
       // (which sits on the screen edge). Cards travel along the arc.
       var Wv = this.W / 2;                // visible half of the oval
-      this.cw = Wv * 0.78;
-      this.ch = Math.min(this.H * 0.18, this.cw * 0.58);
-      gap = this.H * 0.07;
-      this.rx = Wv * 0.52;                // path of card centres (ellipse)
-      this.ry = this.H * 0.45;
+      // square cards: no corners sticking out of the oval
+      this.cw = this.ch = Math.min(this.H * 0.19, Wv * 0.46);
+      gap = this.H * 0.045;
+      this.rx = Wv * 0.5;                 // path of card centres (ellipse)
+      this.ry = this.H * 0.37;
       this.step = (this.ch + gap) / this.ry * 180 / Math.PI;
       this.pxPerItem = this.ch + gap;
       this.buildPool(Math.min(this.n, Math.floor(100 / this.step) * 2 + 3));
@@ -194,10 +195,10 @@
         var sgn = this.side === "left" ? 1 : -1;
         var x = sgn * this.rx * Math.cos(ar);
         var y = this.ry * Math.sin(ar);
-        var sc = (0.7 + 0.3 * cos) * (1 + near * 0.06) * (1 + h * 0.06);
+        var sc = (0.72 + 0.28 * cos) * (1 + near * 0.06) * (1 + h * 0.06);
         el.style.transform = "translate3d(" + x.toFixed(2) + "px," + y.toFixed(2) + "px,0) rotate(" +
           (sgn * a * 0.22).toFixed(3) + "deg) scale(" + sc.toFixed(4) + ")";
-        el.style.opacity = clamp(cos / 0.45, 0, 1).toFixed(3);
+        el.style.opacity = clamp((cos - 0.12) / 0.4, 0, 1).toFixed(3);
         slot.shade.style.opacity = ((1 - cos) * 0.45 * (1 - h)).toFixed(3);
         el.style.zIndex = Math.round(cos * 100) + 100 + Math.round(h * 60);
         continue;
@@ -248,6 +249,7 @@
     return this.items[mod(Math.round(this.target), this.n)];
   };
   Drum.prototype.currentIndex = function () { return mod(Math.round(this.target), this.n); };
+  Drum.prototype.highlight = function (abs) { this.selected = abs; this.render(); };
 
   Drum.prototype.setActive = function (on) {
     if (this.active === on) return;
@@ -261,6 +263,7 @@
 
     // Mouse wheel / trackpad: rotate, then snap after the gesture ends
     this.el.addEventListener("wheel", function (e) {
+      if (sceneOut > 0.02) return;      // drums are leaving: normal page scroll
       e.preventDefault();
       var d = e.deltaY;
       if (self.horizontal && Math.abs(e.deltaX) > Math.abs(d)) d = e.deltaX;
@@ -282,7 +285,10 @@
       if (e.pointerType !== "mouse") return;
       var card = e.target.closest && e.target.closest(".card");
       var abs = card ? parseInt(card.getAttribute("data-abs"), 10) : null;
-      if (abs !== self.hoverAbs) { self.hoverAbs = abs; self.kick(); }
+      if (abs !== self.hoverAbs) {
+        self.hoverAbs = abs; self.kick();
+        if (abs !== null && self.onHover) self.onHover(self, abs);
+      }
     });
     this.el.addEventListener("pointerleave", function () {
       if (self.hoverAbs !== null) { self.hoverAbs = null; self.kick(); }
@@ -381,7 +387,7 @@
     return el;
   }
 
-  function buildProject(p, drum) {
+  function buildProject(p, drum, abs) {
     var el = tplProject.content.firstElementChild.cloneNode(true);
     applyI18n(el);
     var main = el.querySelector(".js-main");
@@ -403,7 +409,7 @@
     });
     if ((p.images || []).length < 2) thumbs.remove();
     el.querySelector(".js-work").textContent = t("work." + p.workType);
-    el.querySelector(".js-count").textContent = (drum.currentIndex() + 1) + " / " + drum.n;
+    el.querySelector(".js-count").textContent = (mod(abs, drum.n) + 1) + " / " + drum.n;
     el.querySelector(".js-title").textContent = loc(p.title);
     el.querySelector(".js-location").textContent = loc(p.location);
     el.querySelector(".js-year-p").textContent = p.year || "—";
@@ -447,11 +453,11 @@
     swap(buildWelcome(), dir || -1);
   }
 
-  function showProject(drum, dir) {
-    var p = drum.currentProject();
+  function showProject(drum, abs, dir) {
+    var p = drum.items[mod(abs, drum.n)];
     if (current && current.type === "project" && current.project === p) return;
-    current = { type: "project", drum: drum, project: p };
-    swap(buildProject(p, drum), dir);
+    current = { type: "project", drum: drum, project: p, abs: abs };
+    swap(buildProject(p, drum, abs), dir);
   }
 
   /* ---------------- wire drums ---------------- */
@@ -462,7 +468,19 @@
     clearTimeout(showTimer);
     // first touch of a drum reacts instantly, then follow the rotation calmly
     var delay = current && current.type === "project" && current.drum === drum ? 140 : 0;
-    showTimer = setTimeout(function () { showProject(drum, lastDir); }, delay);
+    showTimer = setTimeout(function () { showProject(drum, Math.round(drum.target), lastDir); }, delay);
+  }
+
+  // Desktop: hovering a card shows its project in the centre (and it stays there)
+  function onHover(drum, abs) {
+    clearTimeout(showTimer);
+    showTimer = setTimeout(function () {
+      if (drum.dragging) return;
+      drums.forEach(function (d) { d.setActive(d === drum); });
+      drum.highlight(abs);
+      var ref = current && current.type === "project" && current.drum === drum ? current.abs : Math.round(drum.target);
+      showProject(drum, abs, abs < ref ? 1 : -1);
+    }, 110);
   }
 
   var leftItems = PROJECTS.filter(function (p) { return p.side !== "right"; });
@@ -474,26 +492,33 @@
     new Drum(document.getElementById("drum-left"), leftItems, onInteract),
     new Drum(document.getElementById("drum-right"), rightItems, onInteract)
   ];
+  drums.forEach(function (d) { d.onHover = onHover; });
 
   current = { type: "welcome" };
   currentEl = buildWelcome();
   stage.appendChild(currentEl);
 
-  /* ---------------- center wheel: welcome first, then normal page scroll ---------------- */
-  var centerLock = 0;
-  document.getElementById("center").addEventListener("wheel", function (e) {
-    if (Date.now() < centerLock) { e.preventDefault(); return; }
-    if (current && current.type === "project" && window.scrollY < 10) {
-      e.preventDefault();
-      centerLock = Date.now() + 650;
-      showWelcome(e.deltaY > 0 ? 1 : -1);
-    }
-  }, { passive: false });
+  /* ---------------- scroll in the centre: drums slide out, then footer ----------------
+     .scene is taller than the screen and its content is sticky, so the first part
+     of the page scroll only pushes the drums sideways (scroll-linked, 0..1). */
+  var scene = document.getElementById("scene");
+  var scrollTick = false;
+  function onScroll() {
+    scrollTick = false;
+    if (mqMobile.matches) { sceneOut = 0; hero.style.removeProperty("--out"); return; }
+    var travel = scene.offsetHeight - window.innerHeight;
+    sceneOut = travel > 0 ? clamp(window.scrollY / travel, 0, 1) : 0;
+    hero.style.setProperty("--out", sceneOut.toFixed(4));
+  }
+  window.addEventListener("scroll", function () {
+    if (!scrollTick) { scrollTick = true; requestAnimationFrame(onScroll); }
+  }, { passive: true });
+  onScroll();
 
   /* ---------------- language & resize ---------------- */
   document.addEventListener("nxt:lang", function () {
     drums.forEach(function (d) { d.relabel(); });
-    var el = current.type === "project" ? buildProject(current.project, current.drum) : buildWelcome();
+    var el = current.type === "project" ? buildProject(current.project, current.drum, current.abs) : buildWelcome();
     if (currentEl) currentEl.replaceWith(el);
     currentEl = el;
   });
@@ -503,6 +528,7 @@
     clearTimeout(rt);
     rt = setTimeout(function () {
       drums.forEach(function (d) { d.measure(); d.render(); });
+      onScroll();
     }, 120);
   }
   window.addEventListener("resize", remeasure);
