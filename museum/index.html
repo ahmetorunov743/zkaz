@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>NXT Fit Out Technical Service · Gallery</title>
+  <meta name="description" content="NXT Fit Out Technical Service — premium fit-out and restoration in Dubai. A walk through our projects.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="is-loading">
+
+  <!-- Loading screen -->
+  <div class="loader" id="loader" aria-live="polite">
+    <img class="loader__logo" src="assets/logo/nxt-logo-black.svg" alt="NXT Fit Out Technical Service" width="180" height="67">
+    <div class="loader__bar"><span id="loader-bar"></span></div>
+    <p class="loader__text" data-i18n="loading"></p>
+  </div>
+
+  <!-- 3D scene -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <!-- Header -->
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <img class="brand__logo" src="assets/logo/nxt-logo-black.svg" alt="NXT Fit Out Technical Service" width="150" height="56">
+    </a>
+    <div class="header__actions">
+      <div class="lang" role="group" data-i18n-attr="aria-label:lang.label">
+        <button type="button" class="lang__btn" data-lang="en">EN</button>
+        <button type="button" class="lang__btn" data-lang="ru">RU</button>
+        <button type="button" class="lang__btn" data-lang="ar">AR</button>
+      </div>
+      <a class="icon-btn" href="https://wa.me/971558208753" target="_blank" rel="noopener" data-i18n-attr="aria-label:header.whatsapp">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l1.1-3.6A8 8 0 1 1 8.4 18.6z"/><path d="M9.2 8.6c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.4l.6 1.5c.1.2 0 .4-.1.6l-.4.5c-.1.1-.1.3 0 .5.6 1 1.4 1.8 2.4 2.3.2.1.4.1.5-.1l.5-.6c.2-.2.4-.2.6-.1l1.4.7c.2.1.3.3.3.5 0 .9-.7 1.7-1.7 1.7-3.1-.2-6.1-3-6.3-6.1 0-.5.2-1 .4-1.3z" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a class="icon-btn" href="#" target="_blank" rel="noopener" data-i18n-attr="aria-label:header.instagram">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+      </a>
+    </div>
+    <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+  </header>
+
+  <!-- Hint at the start -->
+  <div class="hint" id="hint">
+    <span class="hint__icon" aria-hidden="true"></span>
+    <span class="js-hint"></span>
+  </div>
+
+  <!-- Project panel -->
+  <aside class="panel" id="panel" aria-hidden="true">
+    <button type="button" class="panel__back" id="panel-back">
+      <span aria-hidden="true">←</span> <span data-i18n="panel.back"></span>
+    </button>
+    <div class="panel__scroll">
+      <div class="gallery">
+        <div class="gallery__main"><img id="panel-main" alt=""></div>
+        <div class="gallery__thumbs" id="panel-thumbs"></div>
+      </div>
+      <div class="panel__head">
+        <span class="chip" id="panel-work"></span>
+        <span class="panel__count" id="panel-count"></span>
+      </div>
+      <h2 class="panel__title" id="panel-title"></h2>
+      <dl class="meta">
+        <div><dt data-i18n="panel.location"></dt><dd id="panel-location"></dd></div>
+        <div><dt data-i18n="panel.year"></dt><dd id="panel-year"></dd></div>
+        <div><dt data-i18n="panel.area"></dt><dd id="panel-area"></dd></div>
+      </dl>
+      <p class="panel__desc" id="panel-desc"></p>
+      <a class="btn-wa" id="panel-wa" href="https://wa.me/971558208753" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l1.1-3.6A8 8 0 1 1 8.4 18.6z"/><path d="M9.2 8.6c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.4l.6 1.5c.1.2 0 .4-.1.6l-.4.5c-.1.1-.1.3 0 .5.6 1 1.4 1.8 2.4 2.3.2.1.4.1.5-.1l.5-.6c.2-.2.4-.2.6-.1l1.4.7c.2.1.3.3.3.5 0 .9-.7 1.7-1.7 1.7-3.1-.2-6.1-3-6.3-6.1 0-.5.2-1 .4-1.3z" fill="currentColor" stroke="none"/></svg>
+        <span data-i18n="panel.whatsapp"></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Footer: slides up at the end of the corridor -->
+  <footer class="site-footer" id="footer">
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <img src="assets/logo/nxt-logo-white.svg" alt="NXT Fit Out Technical Service" width="150" height="56">
+        <p data-i18n="footer.tagline"></p>
+      </div>
+      <div class="footer__col">
+        <h3 data-i18n="footer.contacts"></h3>
+        <a class="footer__phone" href="tel:+971558208753" dir="ltr">+971 55 820 8753</a>
+        <div class="footer__social">
+          <a class="icon-btn icon-btn--dark" href="https://wa.me/971558208753" target="_blank" rel="noopener" data-i18n-attr="aria-label:header.whatsapp">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l1.1-3.6A8 8 0 1 1 8.4 18.6z"/><path d="M9.2 8.6c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.4l.6 1.5c.1.2 0 .4-.1.6l-.4.5c-.1.1-.1.3 0 .5.6 1 1.4 1.8 2.4 2.3.2.1.4.1.5-.1l.5-.6c.2-.2.4-.2.6-.1l1.4.7c.2.1.3.3.3.5 0 .9-.7 1.7-1.7 1.7-3.1-.2-6.1-3-6.3-6.1 0-.5.2-1 .4-1.3z" fill="currentColor" stroke="none"/></svg>
+          </a>
+          <a class="icon-btn icon-btn--dark" href="#" target="_blank" rel="noopener" data-i18n-attr="aria-label:header.instagram">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="footer__col">
+        <h3 data-i18n="footer.legal"></h3>
+        <a href="privacy.html" data-i18n="footer.privacy"></a>
+        <a href="terms.html" data-i18n="footer.terms"></a>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© <span class="js-year"></span> NXT Fit Out Technical Service. <span data-i18n="footer.rights"></span></span>
+      <span class="footer__version js-version"></span>
+    </div>
+  </footer>
+
+  <!-- Three.js r128 (classic script, works from file://). Local copy is the offline fallback. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>window.THREE || document.write('<script src="vendor/three.min.js"><\/script>');</script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+  <script>(window.THREE && THREE.Reflector) || document.write('<script src="vendor/Reflector.js"><\/script>');</script>
+
+  <script src="i18n.js"></script>
+  <script src="projects.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
