@@ -101,7 +101,14 @@
      ------------------------------------------------------------------ */
   var coarse = window.matchMedia("(pointer: coarse)").matches;
   var lowEnd = coarse || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
-  var Q = { reflect: !lowEnd && !!THREE.Reflector, dpr: Math.min(window.devicePixelRatio || 1, lowEnd ? 1.5 : 2) };
+  var DPR = window.devicePixelRatio || 1;
+  var Q = {
+    reflect: !lowEnd && !!THREE.Reflector,
+    // ultra: render above the screen resolution on desktops for a crisp image; phones stay light
+    dpr: lowEnd ? Math.min(DPR, 2) : Math.min(Math.max(DPR, 1.5), 2),   // the FPS check lowers it if needed
+    reflectScale: lowEnd ? 0.5 : 0.8,
+    tex: lowEnd ? 1.3 : 1.6        // resolution multiplier for photos and wall texts
+  };
   var mqCompact = window.matchMedia("(max-width: 760px), (orientation: portrait) and (max-width: 1100px)");
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -110,22 +117,34 @@
      ------------------------------------------------------------------ */
   var W = 6, H = 3.9, EYE = 1.62;
   var SPACING = 3.4;                // distance between pictures along the path (they alternate sides)
-  var PW = 1.5, PH = 1.06, PY = 1.72;
+  var PW = 1.7, PH = 1.2, PY = 1.74;       // outer size of the mat inside the frame
+  var MAT = 0.09;                            // white passe-partout border
   var N = PROJECTS.length;
   var FIRST_S = 5;                  // first picture, metres after the entrance arch
   var ENTRY = 13;                   // free stretch around the arch (CTA wall + entrance)
   var START_D = 7;                  // where the visitor stands before the arch (set in layout)
 
-  /* The corridor is a closed oval (ellipse). Its size grows with the number of
-     projects, so the loop never ends and never feels empty. */
-  var P_WANT = Math.max(72, N * SPACING + ENTRY);
-  var EA = P_WANT / 5.44, EB = EA * 0.72;          // ellipse radii (perimeter ≈ 5.44·a for b = 0.72·a)
-  var SAMPLES = 2400, PX = [], PZ = [], CUM = [0];
-  for (var si = 0; si <= SAMPLES; si++) {
-    var th = Math.PI / 2 + si / SAMPLES * Math.PI * 2;   // start on the flattest part of the oval
-    PX.push(EA * Math.cos(th)); PZ.push(-EB * Math.sin(th));
-    if (si) CUM.push(CUM[si - 1] + Math.hypot(PX[si] - PX[si - 1], PZ[si] - PZ[si - 1]));
-  }
+  /* The corridor is a closed oval in the shape of a stadium: two long straight
+     galleries (both walls in view, like a classic museum) joined by two gentle
+     half-turns. It grows with the number of projects, so the loop never ends. */
+  var P_WANT = Math.max(80, N * SPACING + ENTRY);
+  var R_TURN = 9.5;                                  // turn radius on the centre line
+  var LSTR = Math.max(16, (P_WANT - 2 * Math.PI * R_TURN) / 2);   // straight length
+  var PX = [], PZ = [], CUM = [0];
+  (function () {
+    var step = 0.05;
+    function add(x, z) {
+      if (PX.length) CUM.push(CUM[CUM.length - 1] + Math.hypot(x - PX[PX.length - 1], z - PZ[PZ.length - 1]));
+      PX.push(x); PZ.push(z);
+    }
+    var hz = LSTR / 2, n, k;
+    n = Math.ceil(hz / step);           for (k = 0; k < n; k++) add(R_TURN, -k / n * hz);                       // half straight, heading -z
+    n = Math.ceil(Math.PI * R_TURN / step); for (k = 0; k < n; k++) { var a = k / n * Math.PI; add(R_TURN * Math.cos(a), -hz - R_TURN * Math.sin(a)); }
+    n = Math.ceil(LSTR / step);         for (k = 0; k < n; k++) add(-R_TURN, -hz + k / n * LSTR);               // straight back, heading +z
+    n = Math.ceil(Math.PI * R_TURN / step); for (k = 0; k < n; k++) { var b = k / n * Math.PI; add(-R_TURN * Math.cos(b), hz + R_TURN * Math.sin(b)); }
+    n = Math.ceil(hz / step);           for (k = 0; k <= n; k++) add(R_TURN, hz - k / n * hz);                   // back to the start
+  })();
+  var SAMPLES = PX.length - 1;
   var PERIM = CUM[SAMPLES];
   var SPACING_REAL = (PERIM - ENTRY) / Math.max(1, N);   // spread pictures evenly over the loop
   function wrapS(v) { return ((v % PERIM) + PERIM) % PERIM; }
@@ -156,7 +175,7 @@
   /* ------------------------------------------------------------------
      renderer / scene / camera
      ------------------------------------------------------------------ */
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: !lowEnd, powerPreference: "high-performance" });
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Q.dpr);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputEncoding = THREE.sRGBEncoding;
@@ -165,26 +184,30 @@
   var FOG = 0xece6dc;
   var scene = new THREE.Scene();
   scene.background = new THREE.Color(FOG);
-  scene.fog = new THREE.Fog(FOG, 9, 40);
+  scene.fog = new THREE.Fog(FOG, 14, 62);
 
   var camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.05, 140);
   var maxAniso = renderer.capabilities.getMaxAnisotropy();
 
-  function canvasTex(w, h, draw, repeat) {
-    var c = document.createElement("canvas"); c.width = w; c.height = h;
-    draw(c.getContext("2d"), w, h);
+  function canvasTex(w, h, draw, repeat, k) {
+    k = k || 1;
+    var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+    var cx = c.getContext("2d"); cx.scale(k, k);
+    draw(cx, w, h);
     var tex = new THREE.CanvasTexture(c);
     tex.encoding = THREE.sRGBEncoding;
-    tex.anisotropy = Math.min(8, maxAniso);
+    tex.anisotropy = maxAniso;
+    tex._k = k; tex._w = w; tex._h = h;
     if (repeat) { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(repeat[0], repeat[1]); }
     tex._canvas = c;
     return tex;
   }
   function redraw(tex, draw) {
-    var c = tex._canvas, ctx = c.getContext("2d");
+    var c = tex._canvas, ctx = c.getContext("2d"), k = tex._k || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, c.width, c.height);
-    draw(ctx, c.width, c.height);
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    draw(ctx, tex._w || c.width, tex._h || c.height);
     tex.needsUpdate = true;
   }
 
@@ -331,8 +354,8 @@
   floorTex.repeat.set(1, 1);
   var floorMat = basic({ map: floorTex, transparent: true, opacity: Q.reflect ? 0.72 : 1, depthWrite: !Q.reflect });
   if (Q.reflect) {
-    reflector = new THREE.Reflector(new THREE.PlaneGeometry(2 * EA + W + 2, 2 * EB + W + 2), {
-      textureWidth: window.innerWidth * Q.dpr * 0.5, textureHeight: window.innerHeight * Q.dpr * 0.5,
+    reflector = new THREE.Reflector(new THREE.PlaneGeometry(2 * R_TURN + W + 2, LSTR + 2 * R_TURN + W + 2), {
+      textureWidth: window.innerWidth * Q.dpr * Q.reflectScale, textureHeight: window.innerHeight * Q.dpr * Q.reflectScale,
       color: 0x8f8a83, clipBias: 0.003
     });
     reflector.rotation.x = -Math.PI / 2;
@@ -347,6 +370,21 @@
     ribbon(side * W / 2, side * W / 2, 0, H, wallMat, 4);
     ribbon(side * (W / 2 - 0.012), side * (W / 2 - 0.012), 0, 0.09, basic({ color: 0xdcd4c8 }), 4);
     ribbon(side * (W / 2 - 0.004), side * (W / 2 - 0.004), 0.09, 0.102, basic({ color: 0x8c8479 }), 4);
+  });
+
+  // soft ambient occlusion in the corners
+  var aoTex = canvasTex(4, 128, function (ctx, w, h) {
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "rgba(70,55,40,0.22)"); g.addColorStop(0.45, "rgba(70,55,40,0.07)"); g.addColorStop(1, "rgba(70,55,40,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  });
+  aoTex.wrapS = THREE.RepeatWrapping; aoTex.flipY = false;
+  var aoMat = function () { return basic({ map: aoTex, transparent: true, depthWrite: false }); };
+  [-1, 1].forEach(function (side) {
+    var wl = side * (W / 2 - 0.02);
+    ribbon(wl, wl, 0.0, 0.55, aoMat(), 4);                                   // wall, above the floor
+    ribbon(wl, wl, H, H - 0.45, aoMat(), 4);                                 // wall, below the ceiling
+    ribbon(side * W / 2, side * (W / 2 - 0.7), 0.004, 0.004, aoMat(), 4, 0.7); // floor along the wall
   });
 
   // ceiling + linear lights following the curve
@@ -367,7 +405,7 @@
   }
 
   // contact wall before the arch: every lap ends with an invitation
-  var endTex = canvasTex(1500, 975, drawEnd);
+  var endTex = canvasTex(1500, 975, drawEnd, null, Q.tex);
   (function () {
     var v = PERIM - 6.5, p = pathAt(v), side = -INNER;            // on the outer wall
     var g = new THREE.Group();
@@ -394,9 +432,9 @@
   // entrance arch across the corridor (you pass it once per lap)
   var OW = 2.5, OH = 2.75, DEPTH = 0.36, PIER = (W - OW) / 2;
   var sideMat = basic({ color: 0xebe4d9 });
-  var leftTex = canvasTex(Math.round(PIER * 400), Math.round(H * 400), drawPierLeft);
-  var rightTex = canvasTex(Math.round(PIER * 400), Math.round(H * 400), drawPierRight);
-  var lintelTex = canvasTex(Math.round(OW * 400), Math.round((H - OH) * 400), drawLintel);
+  var leftTex = canvasTex(Math.round(PIER * 400), Math.round(H * 400), drawPierLeft, null, Q.tex);
+  var rightTex = canvasTex(Math.round(PIER * 400), Math.round(H * 400), drawPierRight, null, Q.tex);
+  var lintelTex = canvasTex(Math.round(OW * 400), Math.round((H - OH) * 400), drawLintel, null, Q.tex);
   function boxWithFront(w, h, d, frontMat) {
     // box face order: +x, -x, +y, -y, +z (front, towards the visitor), -z
     return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [sideMat, sideMat, sideMat, sideMat, frontMat, basic({ color: WALL_COLOR })]);
@@ -460,7 +498,9 @@
   var frameMat = new THREE.MeshStandardMaterial({ color: 0x5b4632, metalness: 0.55, roughness: 0.38 });
   var fixtureMat = new THREE.MeshStandardMaterial({ color: 0x2a2622, metalness: 0.4, roughness: 0.5 });
   var frameGeo = new THREE.BoxGeometry(PW + 0.07, PH + 0.07, 0.045);
-  var photoGeo = new THREE.PlaneGeometry(PW, PH);
+  var photoGeo = new THREE.PlaneGeometry(PW - MAT * 2, PH - MAT * 2);
+  var matGeo = new THREE.PlaneGeometry(PW, PH);
+  var matMat = basic({ color: 0xfbf8f2 });
   var poolGeo = new THREE.PlaneGeometry(1.9, 3.0);
   var shadowGeo = new THREE.PlaneGeometry(PW + 0.6, PH + 0.6);
   var plaqueGeo = new THREE.PlaneGeometry(0.5, 0.15);
@@ -474,7 +514,7 @@
     var v = FIRST_S + i * SPACING_REAL;
     var pp = pathAt(v);
     // flat pictures on the convex inner wall need a few centimetres of clearance
-    var bulge = side === INNER ? (0.95 * 0.95) / (2 * Math.max(3, radiusAt(v) - W / 2)) : 0;
+    var bulge = side === INNER ? (1.0 * 1.0) / (2 * Math.max(3, radiusAt(v) - W / 2)) : 0;
     var lat = side * (W / 2 - 0.006 - bulge);
     var g = new THREE.Group();
     g.position.set(pp.x + pp.rx * lat, 0, pp.z + pp.rz * lat);
@@ -487,14 +527,15 @@
     shadow.position.set(0, PY - 0.05, 0.005); g.add(shadow);
     var art = new THREE.Group(); art.position.set(0, PY, 0); g.add(art);
     var frame = new THREE.Mesh(frameGeo, frameMat); frame.position.z = 0.03; art.add(frame);
-    var photo = new THREE.Mesh(photoGeo, basic({ color: greyPhoto })); photo.position.z = 0.0535; art.add(photo);
+    var mat = new THREE.Mesh(matGeo, matMat); mat.position.z = 0.053; art.add(mat);
+    var photo = new THREE.Mesh(photoGeo, basic({ color: greyPhoto })); photo.position.z = 0.0545; art.add(photo);
     var plaque = new THREE.Mesh(plaqueGeo, basic({ color: 0xf7f3ec, transparent: true }));
     plaque.position.set(0, PY - PH / 2 - 0.24, 0.006); g.add(plaque);
     var fix = new THREE.Mesh(fixtureGeo, fixtureMat);
     fix.position.set(0, H - 0.14, 0.55); fix.rotation.x = -0.55; g.add(fix);
 
-    photo.userData.index = i; frame.userData.index = i;
-    pickables.push(photo, frame);
+    photo.userData.index = i; frame.userData.index = i; mat.userData.index = i;
+    pickables.push(photo, frame, mat);
     scene.add(g);
     g.updateMatrixWorld(true);
     var center = new THREE.Vector3(0, PY - 0.2, 0.05).applyMatrix4(g.matrixWorld);
@@ -507,12 +548,12 @@
     pic.loading = true;
     var src = pic.p.images && pic.p.images[0];
     function usePlaceholder() {
-      var tex = canvasTex(768, 543, function (ctx, w, h) { paintPlaceholder(ctx, w, h, pic.p.id || pic.i); });
+      var tex = canvasTex(800, 565, function (ctx, w, h) { paintPlaceholder(ctx, w, h, pic.p.id || pic.i); }, null, Q.tex);
       applyPhoto(pic, tex);
     }
     if (src) {
       new THREE.TextureLoader().load(src, function (tex) {
-        tex.encoding = THREE.sRGBEncoding; tex.anisotropy = Math.min(8, maxAniso);
+        tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso;
         applyPhoto(pic, tex);
       }, undefined, usePlaceholder);   // file:// blocks WebGL photos -> placeholder
     } else usePlaceholder();
@@ -521,7 +562,7 @@
     if (!pic.loading) { tex.dispose(); return; }        // was unloaded meanwhile
     pic.photoTex = tex; pic.loading = false;
     pic.photo.material.map = tex; pic.photo.material.color.set(0xffffff); pic.photo.material.needsUpdate = true;
-    pic.plaqueTex = canvasTex(500, 150, function (ctx, w, h) { drawPlaque(ctx, w, h, pic); });
+    pic.plaqueTex = canvasTex(500, 150, function (ctx, w, h) { drawPlaque(ctx, w, h, pic); }, null, Q.tex * 1.4);
     pic.plaque.material.map = pic.plaqueTex; pic.plaque.material.color.set(0xffffff); pic.plaque.material.needsUpdate = true;
     dirty = true;
   }
@@ -576,7 +617,7 @@
     START_D = d;
     renderer.setPixelRatio(Q.dpr);
     renderer.setSize(w, h, false);
-    if (reflector) reflector.getRenderTarget().setSize(w * Q.dpr * 0.5, h * Q.dpr * 0.5);
+    if (reflector) reflector.getRenderTarget().setSize(w * Q.dpr * Q.reflectScale, h * Q.dpr * Q.reflectScale);
     camera.updateProjectionMatrix();
     dirty = true;
   }
@@ -584,10 +625,19 @@
   var tmpObj = new THREE.Object3D();
   var tmpCam = new THREE.PerspectiveCamera();
   var pa = {}, pb = {};
+  function bend(v) {                                 // 0 on the straights, 1 deep in a turn (smoothed)
+    var sum = 0;
+    for (var k = -2; k <= 2; k++) sum += Math.min(1, R_TURN / radiusAt(v + k * 2));
+    return sum / 5;
+  }
   function walkPose(out) {
     pathAt(s, pa);
-    pathAt(s + 5, pb);                               // look a few metres ahead: the view follows the curve
-    var baseYaw = Math.atan2(-(pb.x - pa.x), -(pb.z - pa.z));
+    pathAt(s + 6, pb);                               // look a few metres ahead: the view follows the curve
+    var bn = bend(s + 2);
+    var shift = -INNER * 0.85 * bn;                  // stand closer to the outer wall in a turn…
+    var aim = INNER * 1.1 * bn;                      // …and aim slightly inwards
+    var cx0 = pa.x + pa.rx * shift, cz0 = pa.z + pa.rz * shift;
+    var baseYaw = Math.atan2(-(pb.x + pb.rx * aim - cx0), -(pb.z + pb.rz * aim - cz0));
     // glance at the picture coming up, smoothly
     var want = 0;
     for (var k = 0; k < pictures.length; k++) {
@@ -600,7 +650,8 @@
     yaw = lerp(yaw, want, 0.08);
     var yy = baseYaw + yaw - mouse.sx * 0.06;
     var pitch = (mqCompact.matches ? 0.015 : 0.07) * nearArch - 0.02 * (1 - nearArch) - mouse.sy * 0.035;
-    out.pos.set(pa.x + pa.rx * Math.sin(s * 0.35) * 0.04, EYE + Math.sin(s * 1.6) * 0.008, pa.z + pa.rz * Math.sin(s * 0.35) * 0.04);
+    var sway = Math.sin(s * 0.35) * 0.04;
+    out.pos.set(cx0 + pa.rx * sway, EYE + Math.sin(s * 1.6) * 0.008, cz0 + pa.rz * sway);
     tmpObj.rotation.set(pitch, yy, 0, "YXZ");
     out.quat.copy(tmpObj.quaternion);
     return out;
