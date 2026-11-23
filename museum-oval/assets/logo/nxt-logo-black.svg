@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112" fill="none">
+<g stroke="#111111" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+<path d="M12 70 V12 L58 70 V12"/>
+<path d="M88 12 L134 70 M134 12 L88 70"/>
+<path d="M160 12 H214 M187 12 V70"/>
+</g>
+<text x="12" y="102" font-family="Helvetica, Arial, sans-serif" font-size="13.5" letter-spacing="2.6" fill="#111111">FIT OUT TECHNICAL SERVICE</text>
+</svg>
