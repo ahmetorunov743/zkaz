@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Venezia Showroom</title>
+  <meta name="description" content="Venezia Showroom: a guided 3D walk through both floors of the showroom.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="3D model of the showroom"></canvas>
+
+  <!-- Intro / loading -->
+  <div class="intro" id="intro">
+    <div class="intro__inner">
+      <p class="intro__kicker">Architectural walkthrough</p>
+      <h1 class="intro__title">Venezia<br>Showroom</h1>
+      <p class="intro__meta">2 floors · 299 m²</p>
+      <div class="intro__bar"><span id="intro-bar"></span></div>
+      <button class="intro__btn" id="intro-btn" type="button" disabled>Loading…</button>
+      <p class="intro__hint">Drag to look around · tap the arrows or the floor to walk</p>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <header class="hud-top">
+    <div class="brand">
+      <span class="brand__name">Venezia</span>
+      <span class="brand__sub">Showroom</span>
+    </div>
+    <div class="place">
+      <span class="place__floor" id="place-floor">Ground floor</span>
+      <span class="place__name" id="place-name">Entrance</span>
+    </div>
+  </header>
+
+  <nav class="hud-bottom" aria-label="Tour navigation">
+    <button class="nav-btn" id="btn-prev" type="button" aria-label="Previous point">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <button class="nav-btn nav-btn--play" id="btn-play" type="button" aria-label="Auto tour">
+      <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>
+      <svg class="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
+    </button>
+    <div class="steps" id="steps"></div>
+    <button class="nav-btn" id="btn-next" type="button" aria-label="Next point">
+      <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </nav>
+
+  <aside class="map" id="map">
+    <div class="map__tabs">
+      <button type="button" class="map__tab" data-floor="0">Ground</button>
+      <button type="button" class="map__tab" data-floor="1">First</button>
+      <button type="button" class="map__toggle" id="map-toggle" aria-label="Hide map">–</button>
+    </div>
+    <canvas id="map-canvas"></canvas>
+  </aside>
+
+  <div class="nowebgl" id="nowebgl" hidden>
+    Your browser cannot show the 3D model. Open the page in a current Chrome, Safari or Firefox.
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>window.THREE || document.write('<script src="vendor/three.min.js"><\/script>');</script>
+  <script src="showroom.js"></script>
+</body>
+</html>
