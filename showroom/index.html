@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>Venezia Showroom</title>
   <meta name="claude:viewport-fit-sides" content="cover">
-  <meta name="description" content="Venezia Showroom: a guided 3D walk through both floors of the showroom.">
+  <meta name="description" content="Colors of Living · Venezia Showroom, Dubai: walk through 300 m² of Italian furniture, stone and light in 3D and book a private viewing.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,27 +14,40 @@
 <body>
   <canvas id="scene" aria-label="3D model of the showroom"></canvas>
 
-  <!-- Intro / loading -->
-  <div class="intro" id="intro">
+  <!-- Hero / loading -->
+  <section class="intro" id="intro">
+    <div class="intro__bg" aria-hidden="true"></div>
     <div class="intro__inner">
-      <p class="intro__kicker">Architectural walkthrough</p>
-      <h1 class="intro__title">Venezia<br>Showroom</h1>
-      <p class="intro__meta">2 floors · 299 m²</p>
-      <div class="intro__bar"><span id="intro-bar"></span></div>
-      <button class="intro__btn" id="intro-btn" type="button" disabled>Loading…</button>
-      <p class="intro__hint">Drag to look around · tap the arrows or the floor to walk</p>
+      <p class="intro__kicker">Colors of Living · Dubai</p>
+      <h1 class="intro__title">Venezia Showroom</h1>
+      <p class="intro__lead">Walk through 300&nbsp;m² of Italian living: furniture, stone and light, styled as real homes and ready to order for yours.</p>
+      <ul class="intro__facts">
+        <li><b>2</b> floors</li>
+        <li><b>299</b> m²</li>
+        <li><b>12</b> styled zones</li>
+      </ul>
+      <div class="intro__actions">
+        <button class="btn btn--primary" id="intro-btn" type="button" disabled>
+          <span class="btn__bar" id="intro-bar"></span><span class="btn__label">Loading the showroom…</span>
+        </button>
+        <button class="btn btn--ghost" id="intro-tour" type="button" disabled>Watch the guided tour</button>
+      </div>
+      <button class="intro__book" type="button" data-book>Book a private viewing →</button>
     </div>
-  </div>
+  </section>
 
   <!-- HUD -->
   <header class="hud-top">
     <div class="brand">
-      <span class="brand__name">Venezia</span>
-      <span class="brand__sub">Showroom</span>
+      <span class="brand__name">Colors of Living</span>
+      <span class="brand__sub">Venezia Showroom</span>
     </div>
-    <div class="place">
-      <span class="place__floor" id="place-floor">Ground floor</span>
-      <span class="place__name" id="place-name">Entrance</span>
+    <div class="hud-top__right">
+      <div class="place">
+        <span class="place__floor" id="place-floor">Ground floor</span>
+        <span class="place__name" id="place-name">Entrance</span>
+      </div>
+      <button class="btn btn--small" type="button" data-book>Book a viewing</button>
     </div>
   </header>
 
@@ -56,15 +69,25 @@
     <div class="map__tabs">
       <button type="button" class="map__tab" data-floor="0">Ground</button>
       <button type="button" class="map__tab" data-floor="1">First</button>
-      <button type="button" class="map__toggle" id="map-toggle" aria-label="Hide map">–</button>
+      <button type="button" class="map__toggle" id="map-toggle" aria-label="Show or hide the plan">–</button>
     </div>
     <canvas id="map-canvas"></canvas>
   </aside>
 
-  <button class="photo-btn" id="photo-btn" type="button" hidden aria-label="Show the visualisation of this view">
-    <img id="photo-thumb" alt="">
-    <span>Render</span>
-  </button>
+  <!-- Zone card: what you are looking at + call to action -->
+  <article class="zone" id="zone" hidden>
+    <button class="zone__thumb" id="photo-btn" type="button" aria-label="Open the visualisation of this view">
+      <img id="photo-thumb" alt="">
+      <span>Render</span>
+    </button>
+    <div class="zone__body">
+      <h2 class="zone__title" id="zone-title"></h2>
+      <p class="zone__text" id="zone-text"></p>
+      <ul class="zone__tags" id="zone-tags"></ul>
+      <button class="btn btn--small btn--accent" id="zone-cta" type="button">Request this look</button>
+    </div>
+    <button class="zone__fold" id="zone-fold" type="button" aria-label="Show more">+</button>
+  </article>
 
   <div class="lightbox" id="lightbox" hidden>
     <figure>
@@ -72,6 +95,52 @@
       <figcaption id="lightbox-cap"></figcaption>
     </figure>
     <button class="lightbox__close" type="button" aria-label="Close">×</button>
+  </div>
+
+  <!-- Booking -->
+  <div class="modal" id="book" hidden>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="book-title">
+      <button class="modal__close" type="button" data-close aria-label="Close">×</button>
+      <div id="book-form-wrap">
+        <p class="modal__kicker">Private viewing</p>
+        <h2 class="modal__title" id="book-title">See it, touch it, order it</h2>
+        <p class="modal__lead">A designer walks you through the showroom and prepares a selection for your project.</p>
+        <form id="book-form" novalidate>
+          <label class="field"><span>Name</span><input id="f-name" name="name" autocomplete="name" required></label>
+          <label class="field"><span>Phone or WhatsApp</span><input id="f-phone" name="phone" type="tel" autocomplete="tel" required></label>
+          <div class="field-row">
+            <label class="field"><span>Preferred date</span><input id="f-date" name="date" type="date"></label>
+            <label class="field"><span>Interested in</span>
+              <select id="f-interest" name="interest">
+                <option>Whole home</option><option>Living room</option><option>Kitchen</option><option>Bedroom</option>
+                <option>Bathroom</option><option>Office / meeting room</option><option>Stone &amp; marble</option>
+              </select>
+            </label>
+          </div>
+          <label class="field"><span>Message <i>(optional)</i></span><textarea id="f-msg" name="message" rows="2"></textarea></label>
+          <p class="form-error" id="f-error" hidden>Please add your name and a phone number.</p>
+          <button class="btn btn--primary btn--wide" type="submit">Request a viewing</button>
+        </form>
+      </div>
+      <div id="book-done" hidden>
+        <p class="modal__kicker">Almost done</p>
+        <h2 class="modal__title">Your request is ready</h2>
+        <p class="modal__lead" id="book-summary"></p>
+        <a class="btn btn--primary btn--wide" id="book-wa" href="#" target="_blank" rel="noopener">Send it on WhatsApp</a>
+        <button class="btn btn--ghost btn--wide" type="button" data-close>Back to the tour</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- End of tour -->
+  <div class="endcard" id="endcard" hidden>
+    <p class="modal__kicker">That was the tour</p>
+    <h2 class="modal__title">Like what you saw?</h2>
+    <p class="modal__lead">Every piece here can be ordered, adapted and delivered for your home.</p>
+    <div class="endcard__actions">
+      <button class="btn btn--primary" type="button" data-book>Book a private viewing</button>
+      <button class="btn btn--ghost" type="button" id="end-restart">Walk again</button>
+    </div>
   </div>
 
   <div class="nowebgl" id="nowebgl" hidden>
