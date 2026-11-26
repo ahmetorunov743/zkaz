@@ -2,7 +2,6 @@ package com.orvenadigital.create.player
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.orvenadigital.create.core.model.Project
 import com.orvenadigital.create.core.model.ProjectJson
 import com.orvenadigital.create.core.model.Samples
+import com.orvenadigital.create.runtime.AndroidPlatform
 import com.orvenadigital.create.runtime.BrandingSplash
 import com.orvenadigital.create.runtime.ProjectRuntime
 import com.orvenadigital.create.runtime.ProjectView
@@ -34,9 +34,6 @@ class PlayerActivity : ComponentActivity() {
         setContent {
             RuntimeTheme(project) {
                 val context = LocalContext.current
-                val runtime = remember {
-                    ProjectRuntime(project) { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
-                }
                 var splash by remember { mutableStateOf(project.showBranding) }
                 LaunchedEffect(Unit) {
                     if (splash) {
@@ -47,6 +44,8 @@ class PlayerActivity : ComponentActivity() {
                 if (splash) {
                     BrandingSplash()
                 } else {
+                    // created after the splash, so the blocks start when the app is visible
+                    val runtime = remember { ProjectRuntime(project, platform = AndroidPlatform(context)) }
                     ProjectView(runtime, Modifier.fillMaxSize().safeDrawingPadding())
                 }
             }

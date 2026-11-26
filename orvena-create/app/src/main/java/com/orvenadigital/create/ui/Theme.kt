@@ -45,6 +45,8 @@ object BrickColors {
         ComponentType.BUTTON -> Color(0xFFFF8A00)
         ComponentType.INPUT -> Color(0xFF12B886)
         ComponentType.CHECKBOX -> Color(0xFF40C057)
+        ComponentType.IMAGE -> Color(0xFFE64980)
+        ComponentType.STAGE -> Color(0xFF0CA678)
         ComponentType.DIVIDER -> Color(0xFF868E96)
         ComponentType.SPACER -> Color(0xFFADB5BD)
     }

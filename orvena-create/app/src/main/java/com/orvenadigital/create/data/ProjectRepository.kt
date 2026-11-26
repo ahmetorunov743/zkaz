@@ -11,6 +11,7 @@ import java.io.File
 class ProjectRepository(context: Context) {
     private val dir = File(context.filesDir, "projects").apply { mkdirs() }
     private val seededFlag = File(dir, ".seeded")
+    private val gameSeededFlag = File(dir, ".seeded_game")
 
     @Synchronized
     fun list(): List<Project> =
@@ -43,9 +44,15 @@ class ProjectRepository(context: Context) {
     /** On the very first launch put the sample project in, so the editor isn't empty. */
     @Synchronized
     fun seedIfFirstLaunch() {
-        if (seededFlag.exists()) return
-        save(Samples.counter(id = Ids.random("p")))
-        seededFlag.createNewFile()
+        if (!seededFlag.exists()) {
+            save(Samples.counter(id = Ids.random("p")))
+            seededFlag.createNewFile()
+        }
+        // 0.0.2: the game sample, also for those who already had 0.0.1
+        if (!gameSeededFlag.exists()) {
+            save(Samples.jumper(id = Ids.random("p")))
+            gameSeededFlag.createNewFile()
+        }
     }
 
     private fun file(id: String) = File(dir, "$id.json")

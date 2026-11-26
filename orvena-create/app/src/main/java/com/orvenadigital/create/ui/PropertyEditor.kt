@@ -37,10 +37,17 @@ import com.orvenadigital.create.core.model.Component
 import com.orvenadigital.create.core.model.ComponentCatalog
 import com.orvenadigital.create.core.model.PropDef
 import com.orvenadigital.create.core.model.PropKind
+import com.orvenadigital.create.core.model.Project
+import com.orvenadigital.create.core.model.picture
+import com.orvenadigital.create.runtime.PictureThumb
 import com.orvenadigital.create.runtime.parseColorOrNull
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
-fun PropertyEditor(component: Component, onChange: (Component) -> Unit) {
+fun PropertyEditor(project: Project, component: Component, onEdit: ((Project) -> Project) -> Unit, onChange: (Component) -> Unit) {
     fun value(def: PropDef) = component.props[def.key] ?: def.default
     fun set(def: PropDef, v: String) = onChange(component.copy(props = component.props + (def.key to v)))
 
@@ -69,7 +76,7 @@ fun PropertyEditor(component: Component, onChange: (Component) -> Unit) {
                 )
                 PropKind.NUMBER -> OutlinedTextField(
                     value = value(def),
-                    onValueChange = { v -> set(def, v.filter { it.isDigit() || it == '.' }.take(5)) },
+                    onValueChange = { v -> set(def, v.filter { it.isDigit() || it == '.' || it == '-' }.take(6)) },
                     label = { Text(def.label) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -81,6 +88,7 @@ fun PropertyEditor(component: Component, onChange: (Component) -> Unit) {
                 }
                 PropKind.COLOR -> ColorPicker(def.label, value(def)) { set(def, it) }
                 PropKind.CHOICE -> ChoicePicker(def, value(def)) { set(def, it) }
+                PropKind.PICTURE -> PicturePropRow(project, def.label, value(def), onEdit) { set(def, it) }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -133,5 +141,28 @@ private fun ChoicePicker(def: PropDef, value: String, onPick: (String) -> Unit) 
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PicturePropRow(project: Project, label: String, value: String, onEdit: ((Project) -> Project) -> Unit, onPick: (String) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    val picture = project.picture(value)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        PictureThumb(picture, Modifier.size(56.dp).background(Color(0xFFF1F3F5)))
+        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+            Text(label, fontWeight = FontWeight.Medium)
+            Text(picture?.name ?: "не выбрана", style = MaterialTheme.typography.bodySmall)
+        }
+        OutlinedButton(onClick = { picking = true }) { Text("Выбрать") }
+    }
+    if (picking) {
+        PicturePickerSheet(
+            title = label,
+            project = project,
+            onEdit = onEdit,
+            onPick = { onPick(it.id) },
+            onDismiss = { picking = false },
+        )
     }
 }

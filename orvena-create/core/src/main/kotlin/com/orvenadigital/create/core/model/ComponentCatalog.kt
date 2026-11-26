@@ -16,9 +16,12 @@ object Props {
     const val ENABLED = "enabled"
     const val CHECKED = "checked"
     const val HEIGHT = "height"
+    const val PICTURE = "picture"
+    const val GRAVITY = "gravity"
+    const val SOLID_EDGES = "solidEdges"
 }
 
-enum class PropKind { TEXT, NUMBER, BOOL, COLOR, CHOICE }
+enum class PropKind { TEXT, NUMBER, BOOL, COLOR, CHOICE, PICTURE }
 
 data class PropDef(
     val key: String,
@@ -50,6 +53,8 @@ object ComponentCatalog {
         ComponentType.BUTTON -> "Кнопка"
         ComponentType.INPUT -> "Поле ввода"
         ComponentType.CHECKBOX -> "Флажок"
+        ComponentType.IMAGE -> "Картинка"
+        ComponentType.STAGE -> "Игровая сцена"
         ComponentType.DIVIDER -> "Разделитель"
         ComponentType.SPACER -> "Отступ"
     }
@@ -62,6 +67,8 @@ object ComponentCatalog {
         ComponentType.BUTTON -> "Нажимается и запускает блоки"
         ComponentType.INPUT -> "Сюда пользователь пишет текст"
         ComponentType.CHECKBOX -> "Галочка вкл/выкл"
+        ComponentType.IMAGE -> "Нарисованная, готовая или фото"
+        ComponentType.STAGE -> "Поле для 2D-игры: спрайты и физика"
         ComponentType.DIVIDER -> "Тонкая линия"
         ComponentType.SPACER -> "Пустое место"
     }
@@ -74,6 +81,8 @@ object ComponentCatalog {
         ComponentType.BUTTON -> "button"
         ComponentType.INPUT -> "input"
         ComponentType.CHECKBOX -> "checkbox"
+        ComponentType.IMAGE -> "image"
+        ComponentType.STAGE -> "stage"
         ComponentType.DIVIDER -> "divider"
         ComponentType.SPACER -> "spacer"
     }
@@ -103,6 +112,18 @@ object ComponentCatalog {
             PropDef(Props.TEXT, "Текст", PropKind.TEXT, ""),
             PropDef(Props.CHECKED, "Отмечен", PropKind.BOOL, "false"),
         ) + common
+        ComponentType.IMAGE -> listOf(
+            PropDef(Props.PICTURE, "Картинка", PropKind.PICTURE, ""),
+            PropDef(Props.HEIGHT, "Высота", PropKind.NUMBER, "120"),
+        ) + common
+        ComponentType.STAGE -> listOf(
+            PropDef(Props.HEIGHT, "Высота", PropKind.NUMBER, "400"),
+            PropDef(Props.BACKGROUND, "Фон", PropKind.COLOR, "#E7F5FF"),
+            PropDef(Props.GRAVITY, "Гравитация (вниз)", PropKind.NUMBER, "800"),
+            PropDef(Props.SOLID_EDGES, "Края — стены", PropKind.BOOL, "true"),
+            visible,
+            fillWidth,
+        )
         ComponentType.DIVIDER -> common
         ComponentType.SPACER -> listOf(PropDef(Props.HEIGHT, "Высота", PropKind.NUMBER, "16"), visible)
     }
@@ -115,6 +136,8 @@ object ComponentCatalog {
     fun mainProp(type: ComponentType): String? = when (type) {
         ComponentType.TEXT, ComponentType.BUTTON, ComponentType.INPUT -> Props.TEXT
         ComponentType.CHECKBOX -> Props.CHECKED
+        ComponentType.IMAGE -> Props.PICTURE
+        ComponentType.STAGE -> Props.BACKGROUND
         ComponentType.COLUMN, ComponentType.ROW, ComponentType.CARD,
         ComponentType.DIVIDER, ComponentType.SPACER -> Props.VISIBLE
     }
@@ -128,6 +151,8 @@ object ComponentCatalog {
         ComponentType.BUTTON -> mapOf(Props.TEXT to "Кнопка")
         ComponentType.INPUT -> mapOf(Props.HINT to "Введите текст", Props.FILL_WIDTH to "true")
         ComponentType.CHECKBOX -> mapOf(Props.TEXT to "Флажок")
+        ComponentType.IMAGE -> emptyMap()
+        ComponentType.STAGE -> mapOf(Props.FILL_WIDTH to "true")
         ComponentType.DIVIDER -> emptyMap()
         ComponentType.SPACER -> emptyMap()
     }

@@ -32,4 +32,5 @@ dependencies {
     api(libs.compose.foundation)
     api(libs.compose.material3)
     api(libs.androidx.activity.compose)
+    api(libs.kotlinx.coroutines.android)
 }

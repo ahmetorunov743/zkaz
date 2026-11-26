@@ -155,3 +155,83 @@ fun suggestPackageName(appName: String, fallbackSeed: String = Ids.random("", 6)
     val last = if (slug.isEmpty() || slug in JAVA_KEYWORDS) "app" + fallbackSeed.filter { it.isLetterOrDigit() }.lowercase() else slug
     return "com.orvenacreate.app.$last"
 }
+
+// ---- sprites ----
+
+fun Screen.sprites(): List<Sprite> = root.allComponents().flatMap { it.sprites }
+
+fun Project.allSprites(): List<Sprite> = allComponents().flatMap { it.sprites }
+
+fun Project.findSprite(id: String): Sprite? = allSprites().firstOrNull { it.id == id }
+
+/** The stage component that holds sprite [spriteId]. */
+fun Project.stageOf(spriteId: String): Component? = allComponents().firstOrNull { c -> c.sprites.any { it.id == spriteId } }
+
+private fun Component.mapAll(transform: (Component) -> Component): Component =
+    transform(copy(children = children.map { it.mapAll(transform) }))
+
+fun Project.updateSprite(id: String, transform: (Sprite) -> Sprite): Project = copy(
+    screens = screens.map { screen ->
+        screen.copy(root = screen.root.mapAll { c ->
+            if (c.sprites.any { it.id == id }) c.copy(sprites = c.sprites.map { if (it.id == id) transform(it) else it }) else c
+        })
+    },
+)
+
+fun Project.removeSprite(id: String): Project = copy(
+    screens = screens.map { screen ->
+        screen.copy(root = screen.root.mapAll { c -> c.copy(sprites = c.sprites.filter { it.id != id }) })
+    },
+)
+
+/** Moves sprite [id] by [delta] in its stage's layer order. */
+fun Project.moveSprite(id: String, delta: Int): Project = copy(
+    screens = screens.map { screen ->
+        screen.copy(root = screen.root.mapAll { c ->
+            val index = c.sprites.indexOfFirst { it.id == id }
+            if (index < 0) return@mapAll c
+            val target = (index + delta).coerceIn(0, c.sprites.lastIndex)
+            val list = c.sprites.toMutableList()
+            list.add(target, list.removeAt(index))
+            c.copy(sprites = list)
+        })
+    },
+)
+
+fun Project.addSprite(stageId: String, sprite: Sprite): Project = copy(
+    screens = screens.map { screen ->
+        screen.copy(root = screen.root.update(stageId) { it.copy(sprites = it.sprites + sprite) })
+    },
+)
+
+fun Project.nextSpriteId(): String {
+    val used = allSprites().mapTo(HashSet()) { it.id }
+    var n = 1
+    while ("sprite$n" in used) n++
+    return "sprite$n"
+}
+
+// ---- pictures ----
+
+fun Project.picture(idOrName: String): Picture? =
+    pictures.firstOrNull { it.id == idOrName } ?: pictures.firstOrNull { it.name == idOrName }
+
+fun Project.nextPictureId(): String {
+    val used = pictures.mapTo(HashSet()) { it.id }
+    var n = 1
+    while ("pic$n" in used) n++
+    return "pic$n"
+}
+
+fun Project.uniquePictureName(base: String): String {
+    val used = pictures.mapTo(HashSet()) { it.name }
+    if (base !in used) return base
+    var n = 2
+    while ("$base $n" in used) n++
+    return "$base $n"
+}
+
+fun Project.addPicture(name: String, source: PictureSource): Pair<Project, Picture> {
+    val picture = Picture(nextPictureId(), uniquePictureName(name), source)
+    return copy(pictures = pictures + picture) to picture
+}

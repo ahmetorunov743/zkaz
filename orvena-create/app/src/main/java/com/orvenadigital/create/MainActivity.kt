@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
     private fun runExportSelfTest() {
         thread(name = "orvena-selftest") {
             try {
-                val project = Samples.counter().copy(name = "Selftest", packageName = SELF_TEST_PACKAGE)
+                val project = Samples.jumper().copy(name = "Selftest", packageName = SELF_TEST_PACKAGE)
                 val out = ExportManager(applicationContext).exportTo(project, File(filesDir, "selftest.apk"))
                 Log.i(TAG, "ORVENA_SELFTEST_OK ${out.absolutePath} ${out.length()}")
             } catch (t: Throwable) {

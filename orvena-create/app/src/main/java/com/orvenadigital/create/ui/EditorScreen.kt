@@ -1,6 +1,5 @@
 package com.orvenadigital.create.ui
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.orvenadigital.create.core.model.Project
 import com.orvenadigital.create.core.model.ProjectFactory
 import com.orvenadigital.create.data.ProjectRepository
+import com.orvenadigital.create.runtime.AndroidPlatform
 import com.orvenadigital.create.runtime.ProjectRuntime
 import com.orvenadigital.create.runtime.ProjectView
 import com.orvenadigital.create.runtime.RuntimeTheme
@@ -74,15 +75,18 @@ fun EditorScreen(repository: ProjectRepository, projectId: String, onClose: () -
     }
 
     var running by remember { mutableStateOf(false) }
+    var pictures by remember { mutableStateOf(false) }
+    val onEdit: ((Project) -> Project) -> Unit = { transform -> project = project?.let(transform) }
     BackHandler(onBack = onClose)
 
-    if (running) {
-        RunScreen(current, onClose = { running = false })
-    } else {
-        EditorContent(
+    when {
+        running -> RunScreen(current, onClose = { running = false })
+        pictures -> PictureLibraryScreen(current, onEdit, onClose = { pictures = false })
+        else -> EditorContent(
             project = current,
-            onEdit = { transform -> project = project?.let(transform) },
+            onEdit = onEdit,
             onRun = { running = true },
+            onPictures = { pictures = true },
             onClose = onClose,
         )
     }
@@ -90,7 +94,13 @@ fun EditorScreen(repository: ProjectRepository, projectId: String, onClose: () -
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EditorContent(project: Project, onEdit: ((Project) -> Project) -> Unit, onRun: () -> Unit, onClose: () -> Unit) {
+private fun EditorContent(
+    project: Project,
+    onEdit: ((Project) -> Project) -> Unit,
+    onRun: () -> Unit,
+    onPictures: () -> Unit,
+    onClose: () -> Unit,
+) {
     var screenId by rememberSaveable { mutableStateOf(project.screens.first().id) }
     val screen = project.screens.firstOrNull { it.id == screenId } ?: project.screens.first()
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -106,6 +116,7 @@ private fun EditorContent(project: Project, onEdit: ((Project) -> Project) -> Un
                     }
                 },
                 actions = {
+                    IconButton(onClick = onPictures) { Icon(Icons.Default.Face, contentDescription = "Картинки") }
                     IconButton(onClick = onRun) { Icon(Icons.Default.PlayArrow, contentDescription = "Запустить") }
                     IconButton(onClick = { exporting = true }) { Icon(Icons.Default.Build, contentDescription = "Собрать APK") }
                 },
@@ -210,7 +221,7 @@ private fun ScreenSelector(
 fun RunScreen(project: Project, onClose: () -> Unit) {
     val context = LocalContext.current
     val runtime = remember(project) {
-        ProjectRuntime(project) { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+        ProjectRuntime(project, platform = AndroidPlatform(context))
     }
     BackHandler(onBack = onClose)
     Scaffold(

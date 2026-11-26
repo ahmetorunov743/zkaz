@@ -22,7 +22,7 @@ alive() {
 }
 
 adb logcat -c || true
-adb install -r "$APKS/OrvenaCreate-0.0.1-demo.apk"
+adb install -r "$APKS/OrvenaCreate-0.0.2-demo.apk"
 adb install -r "$APKS/exported-counter.apk"
 
 echo "--- exported sample (built on CI) ---"
@@ -50,7 +50,13 @@ adb exec-out run-as "$EDITOR" cat files/selftest.apk > selftest.apk
 ls -la selftest.apk
 adb install -r selftest.apk
 adb shell am start -W -n com.orvenacreate.selftest/com.orvenadigital.create.player.PlayerActivity
-sleep 6; shot selftest-app
+sleep 4; shot selftest-game
+# tap the middle of the screen (the game stage): the frog jumps, blocks keep running
+SIZE=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1)
+W=${SIZE%x*}; H=${SIZE#*x}
+adb shell input tap $((W / 2)) $((H / 2))
+sleep 0.4; shot selftest-jump
+sleep 3; shot selftest-after
 alive com.orvenacreate.selftest
 
 if adb logcat -d -b crash | grep "FATAL EXCEPTION" > /dev/null; then
