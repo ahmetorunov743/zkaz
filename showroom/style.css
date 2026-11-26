@@ -119,6 +119,7 @@ button { cursor: pointer; }
 .step { width: 7px; height: 7px; padding: 0; border-radius: 50%; border: 0; background: rgba(255,255,255,.3); flex: none; transition: background .2s, transform .2s; }
 .step.is-upper { background: rgba(217,185,140,.38); }
 .step.is-active { background: #fff; transform: scale(1.35); }
+.step-count { display: none; min-width: 64px; text-align: center; font-size: 13px; letter-spacing: .08em; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.85); }
 
 /* ---------- minimap ---------- */
 .map {
@@ -223,8 +224,8 @@ button { cursor: pointer; }
   .zone.is-open .zone__text { display: block; }
   .zone__fold { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: transparent; font-size: 18px; line-height: 1; }
   .zone .btn--small { min-height: 34px; }
-  .step { width: 6px; height: 6px; }
-  .steps { gap: 4px; padding: 0 2px; }
+  .steps { display: none; }
+  .step-count { display: block; }
   .nav-btn { width: 38px; height: 38px; }
   .intro { align-items: flex-end; }
   .intro__actions .btn { flex: 1 1 100%; }

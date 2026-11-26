@@ -1610,13 +1610,23 @@ const NODES = [
   { x: 20.05, z: 6.8, f: 0, yaw: -90, name: 'Landing', stair: true, zone: 'stairs' },
   { x: 17.9, z: 6.78, f: 0, yaw: -90, name: 'Stairs', stair: true, zone: 'stairs' },
   { x: 15.5, z: 6.65, f: 1, yaw: -25, name: 'First Floor', photo: 'bedroom', zone: 'bedroom' },
-  { x: 12.75, z: 5.6, f: 1, yaw: 58, name: 'Bedroom', zone: 'bedroom' },
+  { x: 16.9, z: 4.4, f: 1, yaw: -92, name: 'Bedroom Suite', zone: 'bedroom', via: [[16.45, 5.75]] },
+  { x: 18.8, z: 4.45, f: 1, yaw: 175, name: 'Tech Kitchen', zone: 'service' },
+  { x: 17.25, z: 1.5, f: 1, yaw: -72, name: 'Bath Corner', zone: 'bath', via: [[17.45, 4.3]] },
+  { x: 19.2, z: 1.05, f: 1, yaw: 12, name: 'Wash Area', zone: 'service', via: [[17.6, 1.05]] },
+  { x: 18.875, z: 2.35, f: 1, yaw: 178, name: 'WC 1', zone: 'service' },
+  { x: 20.35, z: 2.35, f: 1, yaw: 178, name: 'WC 2', zone: 'service', via: [[18.88, 1.3], [20.35, 1.3]] },
+  { x: 14.6, z: 1.85, f: 1, yaw: 8, name: 'Bath by the Window', zone: 'bath', via: [[20.35, 1.3], [18.6, 1.02], [17.5, 1.05]] },
+  { x: 12.75, z: 5.6, f: 1, yaw: 58, name: 'Bedroom', zone: 'bedroom', via: [[12.95, 2.2]] },
   { x: 12.75, z: 1.9, f: 1, yaw: 60, name: 'Freestanding Bath', photo: 'bathtub', zone: 'bath' },
   { x: 10.0, z: 2.1, f: 1, yaw: -130, name: 'Presentation Table', photo: 'presentation', zone: 'studio' },
   { x: 9.3, z: 5.6, f: 1, yaw: 150, name: 'Tub & Vanity', photo: 'vanity', zone: 'bath' },
   { x: 5.6, z: 6.0, f: 1, yaw: -95, name: 'Meeting Room', photo: 'meeting', zone: 'meeting' },
-  { x: 6.2, z: 2.3, f: 1, yaw: -15, name: 'Basins & Shower', zone: 'studio' },
-  { x: 3.8, z: 1.3, f: 1, yaw: -110, name: 'Office', zone: 'office' }
+  { x: 3.85, z: 6.15, f: 1, yaw: -95, name: 'Meeting Table', zone: 'meeting', via: [[5.1, 5.86]] },
+  { x: 0.9, z: 4.85, f: 1, yaw: 128, name: 'Meeting Room · TV Wall', zone: 'meeting', via: [[3.5, 4.95]] },
+  { x: 6.2, z: 2.3, f: 1, yaw: -15, name: 'Basins & Shower', zone: 'studio', via: [[3.6, 5.0], [4.45, 5.86], [5.2, 5.86], [5.8, 5.5]] },
+  { x: 3.8, z: 1.3, f: 1, yaw: -110, name: 'Office', zone: 'office' },
+  { x: 0.8, z: 2.85, f: 1, yaw: 42, name: 'Design Office', zone: 'office', via: [[3.7, 2.75]] }
 ];
 /** floor height under a point: flight 1, corner landing, flight 2, floors */
 function groundAt(x, z, fb) {
@@ -1660,8 +1670,14 @@ function goTo(i) {
   const idx = [], step = i > from ? 1 : -1;
   if (i !== from) for (let k = from + step; step > 0 ? k <= i : k >= i; k += step) idx.push(k);
   else idx.push(i);
-  const pts = [new T.Vector3(pos.x, pos.y - EYE, pos.z)];
-  idx.forEach((k) => pts.push(new T.Vector3(NODES[k].x, NODES[k].groundY, NODES[k].z)));
+  // via: detour points that lead into node k (walked in reverse when going backwards)
+  const pts = [new T.Vector3(pos.x, pos.y - EYE, pos.z)], at = [];
+  idx.forEach((k) => {
+    const owner = step > 0 ? NODES[k] : NODES[k - step];
+    const via = (i !== from && owner.via) ? (step > 0 ? owner.via : owner.via.slice().reverse()) : [];
+    via.forEach((v) => pts.push(new T.Vector3(v[0], owner.groundY, v[1])));
+    pts.push(new T.Vector3(NODES[k].x, NODES[k].groundY, NODES[k].z)); at.push(pts.length - 1);
+  });
   const curve = pts.length === 2 ? new T.LineCurve3(pts[0], pts[1]) : new T.CatmullRomCurve3(pts, false, 'centripetal');
   const L = Math.max(0.01, curve.getLength());
   let acc = 0; const cum = [0];
@@ -1682,7 +1698,7 @@ function goTo(i) {
   moving = {
     curve, L, dur, t: 0, to: i,
     y0: view.yaw, p0: view.pitch, y1, ty, aT, bT,
-    marks: idx.slice(0, -1).map((k, j) => ({ i: k, u: cum[j + 1] / acc })), passed: 0
+    marks: idx.slice(0, -1).map((k, j) => ({ i: k, u: cum[at[j]] / acc })), passed: 0
   };
   spin.v = spin.p = 0;
   hideArrows();
@@ -1795,6 +1811,7 @@ function showArrows() {
 const elName = $('place-name'), elFloor = $('place-floor'), elSteps = $('steps');
 const btnPrev = $('btn-prev'), btnNext = $('btn-next'), btnPlay = $('btn-play');
 const photoBtn = $('photo-btn'), photoThumb = $('photo-thumb'), lightbox = $('lightbox'), lbImg = $('lightbox-img'), lbCap = $('lightbox-cap');
+const stepCount = $('step-count');
 const stepEls = NODES.map((n, i) => {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'step' + (n.f ? ' is-upper' : '');
@@ -1814,6 +1831,7 @@ function onPass() {
   showName(n);
   elFloor.textContent = n.f ? 'First floor' : 'Ground floor';
   stepEls.forEach((b, i) => b.classList.toggle('is-active', i === current));
+  stepCount.textContent = (current + 1) + ' / ' + NODES.length;
   if (mapFloor !== n.f) { mapFloor = n.f; updateTabs(); }
 }
 function onArrive() {
@@ -1821,6 +1839,7 @@ function onArrive() {
   showName(n);
   elFloor.textContent = n.f ? 'First floor' : 'Ground floor';
   stepEls.forEach((b, i) => b.classList.toggle('is-active', i === current));
+  stepCount.textContent = (current + 1) + ' / ' + NODES.length;
   btnPrev.disabled = current === 0;
   btnNext.disabled = current === NODES.length - 1;
   showZone(n);
@@ -1880,6 +1899,7 @@ const ZONES = {
   bath: { title: 'Bathroom Gallery', interest: 'Bathroom', text: 'Black freestanding bathtubs, a double vanity on fluted travertine and blue marble pilasters.', tags: ['Black solid surface', 'Fluted travertine', 'Blue marble'] },
   studio: { title: 'Material Studio', interest: 'Stone & marble', text: 'A presentation table in Calacatta Viola for choosing stone, basins and a walk-in shower behind glass.', tags: ['Calacatta Viola', 'Travertine', 'Bronze glass'] },
   meeting: { title: 'Meeting Room', interest: 'Office / meeting room', text: 'A table for six under glass globe pendants, with a TV wall and a library of stone samples.', tags: ['Grey marble', 'Leather', 'Glass globes'] },
+  service: { title: 'WC, Wash Area & Tech Kitchen', interest: 'Bathroom', text: 'Two guest WCs in blue marble, a wash area with a stone basin and a walnut tech kitchen: every service room finished like the showroom.', tags: ['Blue marble', 'Walnut', 'Ceramic'] },
   office: { title: 'Design Office', interest: 'Office / meeting room', text: 'Four workstations where your project is drawn, priced and ordered.', tags: ['Walnut', 'Bouclé', 'Lacquer'] }
 };
 const zoneEl = $('zone'), endEl = $('endcard'), bookEl = $('book');
@@ -1981,7 +2001,11 @@ function drawMap() {
   c.setLineDash([s * 0.25, s * 0.2]); c.strokeStyle = 'rgba(160,110,60,.9)'; c.lineWidth = Math.max(1.5, s * 0.08);
   c.beginPath(); let started = false;
   NODES.forEach((n) => {
-    if (n.f === mapFloor || n.stair) { if (!started) { c.moveTo(mx(n.x), mz(n.z)); started = true; } else c.lineTo(mx(n.x), mz(n.z)); }
+    if (n.f === mapFloor || n.stair) {
+      if (!started) { c.moveTo(mx(n.x), mz(n.z)); started = true; return; }
+      (n.via || []).forEach((v) => c.lineTo(mx(v[0]), mz(v[1])));
+      c.lineTo(mx(n.x), mz(n.z));
+    }
   });
   c.stroke(); c.setLineDash([]);
   NODES.forEach((n, i) => {
@@ -2165,7 +2189,7 @@ async function boot() {
   introBtn.disabled = false; introBtn.querySelector('.btn__label').textContent = 'Start the 3D tour';
   $('intro-tour').disabled = false;
   window.__showroom = {
-    goTo, NODES, view,
+    goTo, NODES, view, FP,
     jump(i) { moving = null; current = i; const n = NODES[i]; pos.set(n.x, n.y, n.z); view.yaw = n.yaw * Math.PI / 180; view.pitch = PITCH0; ao = 1; onArrive(); dirty = true; },
     setAuto,
     sim(dt) { update(dt); return { current, yaw: view.yaw, pitch: view.pitch, x: pos.x, y: pos.y, z: pos.z, moving: !!moving }; },
