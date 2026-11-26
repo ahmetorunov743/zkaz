@@ -47,17 +47,22 @@ const KW_X0 = 18.2, KW_X1 = 19.22, KW_Z0 = 1.32, KW_Z1 = 6.16;   // kitchen cabi
 // ------------------------------------------------------------------
 const canvas = $('scene');
 let renderer;
+const isMobile = Math.min(window.innerWidth, window.innerHeight) < 700 || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+// Quality tier. LOW = phones, tablets and weak laptops: one direct render pass with
+// MSAA, no post-processing, no point lights, standard materials. ?q=low / ?q=high override.
+const QPARAM = new URLSearchParams(location.search).get('q');
+const LOW = QPARAM === 'low' || (QPARAM !== 'high' && (isMobile || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4));
 try {
-  renderer = new T.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
+  renderer = new T.WebGLRenderer({ canvas, antialias: LOW, powerPreference: 'high-performance', stencil: false });
 } catch (e) { $('nowebgl').hidden = false; throw e; }
-const isMobile = Math.min(window.innerWidth, window.innerHeight) < 700 || /Android|iPhone|iPad/i.test(navigator.userAgent);
-const DPR_MAX = Math.min(window.devicePixelRatio || 1, 2);
-let dprScale = isMobile ? 0.8 : 1;           // adaptive while moving
+const DPR_MAX = Math.min(window.devicePixelRatio || 1, LOW ? 1.5 : 2);
+let dprScale = 1;           // adapted between walks
 renderer.outputColorSpace = T.SRGBColorSpace;
 renderer.toneMapping = T.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = T.PCFSoftShadowMap;
+renderer.shadowMap.type = LOW ? T.PCFShadowMap : T.PCFSoftShadowMap;
 renderer.shadowMap.autoUpdate = false;
 const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
 
@@ -272,7 +277,13 @@ function buildGeneratedTextures() {
 // ------------------------------------------------------------------
 const MT = {};
 const std = (o) => new T.MeshStandardMaterial(o);
-const phys = (o) => new T.MeshPhysicalMaterial(o);
+const PHYS_ONLY = ['sheen', 'sheenRoughness', 'sheenColor', 'clearcoat', 'clearcoatRoughness', 'transmission', 'thickness', 'ior', 'specularIntensity', 'specularColor'];
+const phys = (o) => {
+  if (!LOW) return new T.MeshPhysicalMaterial(o);
+  const q = { ...o }; PHYS_ONLY.forEach((k) => delete q[k]);
+  if (o.clearcoat) q.roughness = Math.min(q.roughness ?? 1, 0.3);
+  return new T.MeshStandardMaterial(q);
+};
 /** mark a material for world-space UVs: one texture tile = sx × sy metres */
 const wuv = (m, sx, sy) => { m.userData.uv = [sx, sy || sx]; return m; };
 const photo = (k) => TX[k] || null;
@@ -373,8 +384,9 @@ function box(w, h, d, mat, x, y, z, ry) {
   return add(m);
 }
 const boxB = (w, h, d, mat, x, y0, z, ry) => box(w, h, d, mat, x, y0 + h / 2, z, ry);
+const lod = (n) => LOW ? Math.max(8, Math.round(n * 0.55)) : n;   // fewer segments on weak devices
 function cyl(rt, rb, h, mat, x, y0, z, seg) {
-  const m = new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 32), mat);
+  const m = new T.Mesh(new T.CylinderGeometry(rt, rb, h, lod(seg || 32)), mat);
   m.position.set(x, y0 + h / 2, z); return add(m);
 }
 const rbCache = new Map();
@@ -405,7 +417,7 @@ function group(x, y, z, ry, parent) {
 }
 function within(g, fn) { const prev = target; target = g; fn(); target = prev; return g; }
 function lathe(points, mat, x, y0, z, seg) {
-  const m = new T.Mesh(new T.LatheGeometry(points.map((p) => new T.Vector2(p[0], p[1])), seg || 28), mat);
+  const m = new T.Mesh(new T.LatheGeometry(points.map((p) => new T.Vector2(p[0], p[1])), lod(seg || 28)), mat);
   m.position.set(x, y0, z); return add(m);
 }
 function plane(w, h, mat, x, y, z, rx, ry) {
@@ -482,7 +494,7 @@ function sculpture(x, y0, z, s) {
     let y = y0;
     for (let i = 0; i < 3; i++) {
       const r = R(0.035, 0.06) * s;
-      const m = new T.Mesh(new T.SphereGeometry(r, 18, 12), pick([MT.stoneware, MT.ceramic, MT.clay, MT.travBlock]));
+      const m = new T.Mesh(new T.SphereGeometry(r, lod(18), lod(12)), pick([MT.stoneware, MT.ceramic, MT.clay, MT.travBlock]));
       m.scale.y = 0.75; m.position.set(x + R(-0.01, 0.01), y + r * 0.75, z); add(m); y += r * 1.45;
     }
   }
@@ -656,13 +668,13 @@ function garland(a, b, sag) {
   cyl(0.05, 0.05, 0.06, MT.bronze, b[0], b[1] + 0.02, b[2], 16);
 }
 function flushPearls() {
-  const geo = new T.SphereGeometry(0.05, 18, 12);
+  const geo = new T.SphereGeometry(0.05, LOW ? 9 : 18, LOW ? 6 : 12);
   geo.scale(1, 1.08, 1);
   const im = new T.InstancedMesh(geo, MT.pearl, pearlPts.length);
   const m = new T.Matrix4();
   pearlPts.forEach((p, i) => { m.makeTranslation(p.x, p.y, p.z); im.setMatrixAt(i, m); });
   shell.add(im);
-  const rm = new T.InstancedMesh(new T.CylinderGeometry(0.018, 0.018, 0.035, 10), MT.bronze, pearlPts.length);
+  const rm = new T.InstancedMesh(new T.CylinderGeometry(0.018, 0.018, 0.035, LOW ? 6 : 10), MT.bronze, pearlPts.length);
   const q = new T.Object3D();
   pearlPts.forEach((p, i) => { q.position.set(p.x, p.y + 0.06, p.z); q.updateMatrix(); rm.setMatrixAt(i, q.matrix); });
   shell.add(rm);
@@ -1326,7 +1338,7 @@ function buildFirst() {
   [[1.5, 5.85, 0.24], [2.1, 6.1, 0.3], [2.7, 5.8, 0.22], [2.4, 6.3, 0.2]].forEach((p) => {
     const yy = F1_CEIL - 0.75 - p[2];
     box(0.006, F1_CEIL - yy, 0.006, MT.brass, p[0], (F1_CEIL + yy) / 2, p[1]);
-    const gm = new T.Mesh(new T.SphereGeometry(p[2], 32, 20), MT.globe); gm.position.set(p[0], yy, p[1]); add(gm);
+    const gm = new T.Mesh(new T.SphereGeometry(p[2], lod(32), lod(20)), MT.globe); gm.position.set(p[0], yy, p[1]); add(gm);
     box(0.025, p[2] * 1.4, 0.025, MT.led, p[0], yy, p[1]);
     cyl(0.03, 0.03, 0.03, MT.brass, p[0], yy + p[2] - 0.01, p[1], 12);
   });
@@ -1554,14 +1566,14 @@ function finishMaterials() {
 // LIGHTING + environment
 // ------------------------------------------------------------------
 function buildLights() {
-  scene.add(new T.HemisphereLight(0xfff1e0, 0x5c4532, 1.1));
+  scene.add(new T.HemisphereLight(0xfff1e0, 0x5c4532, LOW ? 1.55 : 1.1));
   const sun = new T.DirectionalLight(0xffe4bc, 4.2);
   const dir = new T.Vector3(-0.5, 0.62, -1).normalize();    // late sun from the facade side
   const center = new T.Vector3(W / 2, 3, D / 2);
   sun.position.copy(center).addScaledVector(dir, 40);
   sun.target.position.copy(center);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(isMobile ? 2048 : 4096, isMobile ? 2048 : 4096);
+  sun.shadow.mapSize.set(LOW ? 2048 : 4096, LOW ? 2048 : 4096);
   const c = sun.shadow.camera;
   c.left = -17; c.right = 17; c.top = 12; c.bottom = -12; c.near = 10; c.far = 80;
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.025; sun.shadow.radius = 3;
@@ -1570,7 +1582,7 @@ function buildLights() {
   fill.position.set(W + 6, 10, D + 8); scene.add(fill);
   [[5.3, 2.9, 4.55, 12], [12.5, 2.9, 2.0, 8], [12.7, 2.9, 5.0, 8], [16.6, 2.9, 3.2, 9], [1.8, 2.9, 4.0, 8], [20.0, 3.2, 4.2, 5],
    [2.2, F1 + 2.6, 1.8, 7], [2.1, F1 + 2.6, 6.0, 7], [8.0, F1 + 2.7, 3.5, 9], [9.6, F1 + 2.7, 6.2, 6], [14.95, F1 + 2.6, 4.2, 8], [14.9, F1 + 2.6, 1.2, 6], [17.0, F1 + 2.6, 6.7, 4]
-  ].forEach((p) => { const l = new T.PointLight(0xffc68a, p[3], 11, 1.6); l.position.set(p[0], p[1], p[2]); scene.add(l); });
+  ].forEach((p) => { if (LOW) return; const l = new T.PointLight(0xffc68a, p[3], 11, 1.6); l.position.set(p[0], p[1], p[2]); scene.add(l); });
 
   const pm = new T.PMREMGenerator(renderer);
   scene.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture;
@@ -1625,7 +1637,7 @@ let current = 0, moving = null, dirty = true;
 let autoTour = false;
 const auto = { t: 0, dur: 2, base: 0 };
 const spin = { v: 0, p: 0 };   // look inertia (rad/s)
-const WALK_SPEED = 2.0, TOUR_SPEED = 0.95;   // m/s (manual / auto tour)
+const WALK_SPEED = 2.4, TOUR_SPEED = 1.5;   // m/s (manual / auto tour)
 
 function applyCamera() {
   camera.position.copy(pos);
@@ -1660,12 +1672,12 @@ function goTo(i) {
   const ty = Math.hypot(pa.x - p0.x, pa.z - p0.z) > 0.05 ? angleTo(p0.x, p0.z, pa.x, pa.z) : view.yaw;
   const tyEnd = Math.hypot(p1.x - pe.x, p1.z - pe.z) > 0.05 ? angleTo(pe.x, pe.z, p1.x, p1.z) : ty;
   const y1 = NODES[i].yaw * Math.PI / 180;
-  // long enough that the head never turns faster than ~40°/s on the tour (~110°/s by hand)
-  const maxTurn = (autoTour ? 40 : 110) * Math.PI / 180;
+  // long enough that the head never turns faster than ~55°/s on the tour (~120°/s by hand)
+  const maxTurn = (autoTour ? 54 : 120) * Math.PI / 180;
   // smootherstep peaks at 1.875× its mean rate, so give each turn enough time
-  const aT = Math.max(autoTour ? 2.6 : 1.4, Math.abs(wrap(ty - view.yaw)) / maxTurn * 1.9);
-  const bT = Math.max(autoTour ? 3.4 : 2.0, Math.abs(wrap(y1 - tyEnd)) / maxTurn * 1.9);
-  const dur = Math.min(autoTour ? 45 : 9, Math.max(1.1, L / speed + (autoTour ? 1.4 : 0.6), (aT + bT) * 0.9));
+  const aT = Math.max(autoTour ? 1.7 : 1.1, Math.abs(wrap(ty - view.yaw)) / maxTurn * 1.9);
+  const bT = Math.max(autoTour ? 2.2 : 1.5, Math.abs(wrap(y1 - tyEnd)) / maxTurn * 1.9);
+  const dur = Math.min(autoTour ? 24 : 7, Math.max(1.0, L / speed + (autoTour ? 0.8 : 0.4), (aT + bT) * 0.9));
   adaptResolution();
   moving = {
     curve, L, dur, t: 0, to: i,
@@ -1696,7 +1708,7 @@ function update(dt) {
     if (m.t >= 1) {
       current = m.to; moving = null; view.yaw = m.y1;
       onArrive();
-      if (autoTour) { auto.t = 0; auto.dur = 5.5; auto.base = view.yaw; }
+      if (autoTour) { auto.t = 0; auto.dur = 3.8; auto.base = view.yaw; }
     }
     dirty = true;
   }
@@ -1710,7 +1722,7 @@ function update(dt) {
   if (autoTour && !moving && !dragging) {
     // slow look left and right, starting and ending at rest, then walk on
     auto.t += dt;
-    const k = Math.min(1, auto.t / auto.dur), amp = auto.dur > 3 ? 0.38 : 0;
+    const k = Math.min(1, auto.t / auto.dur), amp = auto.dur > 3 ? 0.3 : 0;
     view.yaw = auto.base + amp * Math.sin(2 * Math.PI * k) * Math.sin(Math.PI * k);
     view.pitch = mix(view.pitch, PITCH0, 1 - Math.exp(-dt * 2));
     dirty = true;
@@ -2063,6 +2075,7 @@ function onTap(cx, cy) {
 // ------------------------------------------------------------------
 let composer, gtao, bloom;
 function setupComposer() {
+  if (LOW) return;
   const rt = new T.WebGLRenderTarget(1, 1, { type: T.HalfFloatType, samples: 4 });
   composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
@@ -2081,10 +2094,11 @@ function setRes(scale) {
   const w = window.innerWidth, h = window.innerHeight;
   const pr = DPR_MAX * scale;
   renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
-  composer.setPixelRatio(pr); composer.setSize(w, h);
+  if (composer) { composer.setPixelRatio(pr); composer.setSize(w, h); }
 }
+let booted = false;
 function resize() {
-  if (!composer) return;
+  if (!booted) return;
   const w = window.innerWidth, h = window.innerHeight;
   camera.aspect = w / h;
   if (w < h) view.fov = Math.max(view.fov, 82);
@@ -2094,13 +2108,15 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 /** adapt resolution between walks (never mid-motion, so nothing pops) */
+let aoOn = !LOW;
 function adaptResolution() {
-  if (frameAvg > 1 / 45 && dprScale > 0.55) { dprScale = Math.max(0.55, dprScale - 0.1); setRes(dprScale); }
-  else if (frameAvg > 1 / 45) bloomOn = false;
+  if (frameAvg > 1 / 40 && aoOn) { aoOn = false; bloomOn = false; }          // weak GPU: drop post effects first
+  else if (frameAvg > 1 / 45 && dprScale > 0.6) { dprScale = Math.max(0.6, dprScale - 0.12); setRes(dprScale); }
   else if (frameAvg < 1 / 100 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.05); setRes(dprScale); }
 }
 function render() {
-  gtao.enabled = ao > 0.005;
+  if (!composer) { renderer.render(scene, camera); return; }
+  gtao.enabled = aoOn && ao > 0.005;
   gtao.blendIntensity = smooth(0, 1, ao);
   bloom.enabled = bloomOn;
   composer.render();
@@ -2109,7 +2125,7 @@ function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   update(dt);
   // ambient occlusion fades out while walking / dragging and back in when still
-  const aoTarget = moving || dragging ? 0 : 1;
+  const aoTarget = (moving || dragging || !aoOn) ? 0 : 1;
   if (ao !== aoTarget) {
     ao = aoTarget ? Math.min(1, ao + dt / 0.7) : Math.max(0, ao - dt / 0.3);
     dirty = true;
@@ -2117,7 +2133,7 @@ function loop(now) {
   if (dirty) {
     applyCamera();
     render();
-    if (moving && ao === 0) frameAvg = mix(frameAvg, dt, 0.05);
+    if (moving && (ao === 0 || !aoOn)) frameAvg = mix(frameAvg, dt, 0.05);
     mapTick += dt;
     if (mapTick > 0.05 || !moving) { drawMap(); mapTick = 0; }
     dirty = false;
@@ -2138,8 +2154,9 @@ async function boot() {
   const steps = [buildGeneratedTextures, buildMaterials, buildShell, buildGround, flushPearls, buildFirst,
     () => { mergeStatic(shell); mergeStatic(floors[0]); mergeStatic(floors[1]); }, buildLights, finishMaterials, buildDiscs, setupComposer];
   for (let i = 0; i < steps.length; i++) { steps[i](); setBar(0.25 + 0.75 * (i + 1) / steps.length); await tick(); }
-  resize();
+  booted = true; resize();
   floors[0].visible = floors[1].visible = true;
+  renderer.compile(scene, camera);
   renderer.shadowMap.needsUpdate = true;
   applyCamera();
   render();
@@ -2152,7 +2169,7 @@ async function boot() {
     jump(i) { moving = null; current = i; const n = NODES[i]; pos.set(n.x, n.y, n.z); view.yaw = n.yaw * Math.PI / 180; view.pitch = PITCH0; ao = 1; onArrive(); dirty = true; },
     setAuto,
     sim(dt) { update(dt); return { current, yaw: view.yaw, pitch: view.pitch, x: pos.x, y: pos.y, z: pos.z, moving: !!moving }; },
-    state: () => ({ current, moving: !!moving, hq: ao >= 1 && !dirty, auto: autoTour, yaw: view.yaw, x: pos.x, z: pos.z, dpr: renderer.getPixelRatio() }),
+    state: () => ({ current, moving: !!moving, hq: (ao >= 1 || !aoOn) && !dirty, low: LOW, auto: autoTour, yaw: view.yaw, x: pos.x, z: pos.z, dpr: renderer.getPixelRatio() }),
     render: () => { dirty = true; },
     info: () => renderer.info.render,
     plan(fl) {   // debug: orthographic top view of one floor, cut below its ceiling
@@ -2162,8 +2179,8 @@ async function boot() {
       const asp = window.innerWidth / window.innerHeight, hh = 6.2;
       const oc = new T.OrthographicCamera(-hh * asp, hh * asp, hh, -hh, 0.1, 100);
       oc.position.set(W / 2 - 1, 40, D / 2); oc.up.set(0, 0, -1); oc.lookAt(W / 2 - 1, 0, D / 2);
-      gtao.enabled = false; bloom.enabled = false;
-      const rp = composer.passes[0]; rp.camera = oc; composer.render(); rp.camera = camera;
+      if (!composer) renderer.render(scene, oc);
+      else { gtao.enabled = false; bloom.enabled = false; const rp = composer.passes[0]; rp.camera = oc; composer.render(); rp.camera = camera; }
       renderer.clippingPlanes = [];
     }
   };
