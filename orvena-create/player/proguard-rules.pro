@@ -1,0 +1,2 @@
+-keep class com.orvenadigital.create.core.model.** { *; }
+-keepattributes *Annotation*, InnerClasses, Signature

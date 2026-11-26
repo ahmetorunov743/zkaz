@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A building brick: body plus two studs, inside the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M32,50h44v24h-44z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M37,42h12v8h-12z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M59,42h12v8h-12z" />
+</vector>
