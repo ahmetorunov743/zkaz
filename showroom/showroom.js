@@ -1530,13 +1530,21 @@ function goTo(i) {
   let acc = 0; const cum = [0];
   for (let k = 1; k < pts.length; k++) { acc += pts[k].distanceTo(pts[k - 1]); cum.push(acc); }
   const speed = autoTour ? TOUR_SPEED : WALK_SPEED;
-  const dur = Math.min(autoTour ? 40 : 8, Math.max(1.1, L / speed + (autoTour ? 1.4 : 0.6)));
   const p0 = curve.getPointAt(0), pa = curve.getPointAt(Math.min(1, 1.2 / L));
+  const pe = curve.getPointAt(Math.max(0, 1 - 1.2 / L)), p1 = curve.getPointAt(1);
+  const ty = Math.hypot(pa.x - p0.x, pa.z - p0.z) > 0.05 ? angleTo(p0.x, p0.z, pa.x, pa.z) : view.yaw;
+  const tyEnd = Math.hypot(p1.x - pe.x, p1.z - pe.z) > 0.05 ? angleTo(pe.x, pe.z, p1.x, p1.z) : ty;
+  const y1 = NODES[i].yaw * Math.PI / 180;
+  // long enough that the head never turns faster than ~40°/s on the tour (~110°/s by hand)
+  const maxTurn = (autoTour ? 40 : 110) * Math.PI / 180;
+  // smootherstep peaks at 1.875× its mean rate, so give each turn enough time
+  const aT = Math.max(autoTour ? 2.6 : 1.4, Math.abs(wrap(ty - view.yaw)) / maxTurn * 1.9);
+  const bT = Math.max(autoTour ? 3.4 : 2.0, Math.abs(wrap(y1 - tyEnd)) / maxTurn * 1.9);
+  const dur = Math.min(autoTour ? 45 : 9, Math.max(1.1, L / speed + (autoTour ? 1.4 : 0.6), (aT + bT) * 0.9));
   adaptResolution();
   moving = {
     curve, L, dur, t: 0, to: i,
-    y0: view.yaw, p0: view.pitch, y1: NODES[i].yaw * Math.PI / 180,
-    ty: Math.hypot(pa.x - p0.x, pa.z - p0.z) > 0.05 ? angleTo(p0.x, p0.z, pa.x, pa.z) : view.yaw,
+    y0: view.yaw, p0: view.pitch, y1, ty, aT, bT,
     marks: idx.slice(0, -1).map((k, j) => ({ i: k, u: cum[j + 1] / acc })), passed: 0
   };
   spin.v = spin.p = 0;
@@ -1555,7 +1563,7 @@ function update(dt) {
     if (Math.hypot(ahead.x - p.x, ahead.z - p.z) > 0.35) {
       m.ty += wrap(angleTo(p.x, p.z, ahead.x, ahead.z) - m.ty) * (1 - Math.exp(-dt * 3));
     }
-    const a = Math.min(0.4, 1.6 / m.dur), b = Math.min(0.55, 2.2 / m.dur);
+    const a = Math.min(0.5, m.aT / m.dur), b = Math.min(0.55, m.bT / m.dur);
     view.yaw = mixAng(mixAng(m.y0, m.ty, smooth(0, a, m.t)), m.y1, smooth(1 - b, 1, m.t));
     view.pitch = mix(m.p0, PITCH0, smooth(0, a, m.t));
     while (m.passed < m.marks.length && s >= m.marks[m.passed].u) { current = m.marks[m.passed].i; onPass(); m.passed++; }
@@ -1942,6 +1950,7 @@ async function boot() {
     goTo, NODES, view,
     jump(i) { moving = null; current = i; const n = NODES[i]; pos.set(n.x, n.y, n.z); view.yaw = n.yaw * Math.PI / 180; view.pitch = PITCH0; ao = 1; onArrive(); dirty = true; },
     setAuto,
+    sim(dt) { update(dt); return { current, yaw: view.yaw, pitch: view.pitch, x: pos.x, y: pos.y, z: pos.z, moving: !!moving }; },
     state: () => ({ current, moving: !!moving, hq: ao >= 1 && !dirty, auto: autoTour, yaw: view.yaw, x: pos.x, z: pos.z, dpr: renderer.getPixelRatio() }),
     render: () => { dirty = true; },
     info: () => renderer.info.render
