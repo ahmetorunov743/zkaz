@@ -144,3 +144,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 32px; text-align: center; background: #120d0a; line-height: 1.6;
 }
 .nowebgl[hidden] { display: none; }
+
+/* ---------- render (photo) button + lightbox ---------- */
+.photo-btn {
+  position: fixed; left: 16px; bottom: calc(80px + var(--safe-b)); z-index: 6;
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 14px 5px 5px; border-radius: 12px;
+  background: var(--glass-strong); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+}
+.photo-btn[hidden] { display: none; }
+.photo-btn img { width: 56px; height: 40px; object-fit: cover; border-radius: 8px; display: block; }
+.lightbox {
+  position: fixed; inset: 0; z-index: 25; display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(10, 7, 5, .92); cursor: zoom-out;
+}
+.lightbox[hidden] { display: none; }
+.lightbox figure { margin: 0; max-width: min(1200px, 100%); }
+.lightbox img { display: block; max-width: 100%; max-height: calc(100vh - 90px); border-radius: 6px; margin: 0 auto; }
+.lightbox figcaption { margin-top: 12px; text-align: center; font-family: var(--serif); font-size: 18px; color: rgba(255,255,255,.85); }
+.lightbox__close {
+  position: absolute; top: max(14px, env(safe-area-inset-top)); right: 16px;
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--glass); font-size: 22px; line-height: 1;
+}
+#map-canvas { aspect-ratio: 26.6 / 11.1; }
+@media (max-width: 640px) {
+  .photo-btn { bottom: calc(76px + var(--safe-b)); left: 16px; }
+  .map:not(.is-collapsed) ~ .photo-btn { display: none; }
+}
