@@ -1496,9 +1496,11 @@ NODES.forEach((n, i) => { n.i = i; n.groundY = groundAt(n.x, n.z, n.f ? F1 : 0);
 const PITCH0 = -0.12;
 const view = { yaw: NODES[0].yaw * Math.PI / 180, pitch: PITCH0, fov: 72 };
 const pos = new T.Vector3(NODES[0].x, NODES[0].y, NODES[0].z);
-let current = 0, moving = null, queue = [], dirty = true, settleYaw = null;
-let autoTour = false, autoTimer = 0;
+let current = 0, moving = null, dirty = true;
+let autoTour = false;
+const auto = { t: 0, dur: 2, base: 0 };
 const spin = { v: 0, p: 0 };   // look inertia (rad/s)
+const WALK_SPEED = 2.0, TOUR_SPEED = 0.95;   // m/s (manual / auto tour)
 
 function applyCamera() {
   camera.position.copy(pos);
@@ -1509,27 +1511,33 @@ function applyCamera() {
 }
 const angleTo = (fx, fz, tx, tz) => Math.atan2(tx - fx, -(tz - fz));
 function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
-const ease = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeSine = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+const smooth = (a, b, t) => { const x = clamp01((t - a) / (b - a)); return x * x * x * (x * (x * 6 - 15) + 10); };
+const mixAng = (a, b, w) => a + wrap(b - a) * w;
 const neighbours = (i) => [i - 1, i + 1].filter((j) => j >= 0 && j < NODES.length);
 
+/** walk to node i along a smooth curve through every node in between */
 function goTo(i) {
-  if (i === current && !moving) return;
-  queue = [];
-  const from = moving ? moving.to : current, step = i > from ? 1 : -1;
-  for (let k = from + step; step > 0 ? k <= i : k >= i; k += step) queue.push(k);
-  if (!moving) startNext();
-}
-function startNext() {
-  if (!queue.length) return;
-  const to = queue.shift(), from = NODES[current], n = NODES[to];
-  const dist = Math.hypot(n.x - from.x, n.z - from.z, n.y - from.y);
-  const last = queue.length === 0;
-  let travelYaw = angleTo(from.x, from.z, n.x, n.z);
-  if (Math.hypot(n.x - from.x, n.z - from.z) < 0.05) travelYaw = view.yaw;
+  const from = moving ? moving.to : current;
+  if (i === from && !moving) return;
+  const idx = [], step = i > from ? 1 : -1;
+  if (i !== from) for (let k = from + step; step > 0 ? k <= i : k >= i; k += step) idx.push(k);
+  else idx.push(i);
+  const pts = [new T.Vector3(pos.x, pos.y - EYE, pos.z)];
+  idx.forEach((k) => pts.push(new T.Vector3(NODES[k].x, NODES[k].groundY, NODES[k].z)));
+  const curve = pts.length === 2 ? new T.LineCurve3(pts[0], pts[1]) : new T.CatmullRomCurve3(pts, false, 'centripetal');
+  const L = Math.max(0.01, curve.getLength());
+  let acc = 0; const cum = [0];
+  for (let k = 1; k < pts.length; k++) { acc += pts[k].distanceTo(pts[k - 1]); cum.push(acc); }
+  const speed = autoTour ? TOUR_SPEED : WALK_SPEED;
+  const dur = Math.min(autoTour ? 40 : 8, Math.max(1.1, L / speed + (autoTour ? 1.4 : 0.6)));
+  const p0 = curve.getPointAt(0), pa = curve.getPointAt(Math.min(1, 1.2 / L));
+  adaptResolution();
   moving = {
-    from: { x: pos.x, z: pos.z, g: pos.y - EYE }, to, t: 0,
-    dur: Math.min(2.2, Math.max(0.65, dist * (last ? 0.32 : 0.24))),
-    yawTravel: travelYaw, yaw1: last ? n.yaw * Math.PI / 180 : travelYaw
+    curve, L, dur, t: 0, to: i,
+    y0: view.yaw, p0: view.pitch, y1: NODES[i].yaw * Math.PI / 180,
+    ty: Math.hypot(pa.x - p0.x, pa.z - p0.z) > 0.05 ? angleTo(p0.x, p0.z, pa.x, pa.z) : view.yaw,
+    marks: idx.slice(0, -1).map((k, j) => ({ i: k, u: cum[j + 1] / acc })), passed: 0
   };
   spin.v = spin.p = 0;
   hideArrows();
@@ -1537,24 +1545,25 @@ function startNext() {
 
 function update(dt) {
   if (moving) {
-    const m = moving, n = NODES[m.to];
+    const m = moving;
     m.t = Math.min(1, m.t + dt / m.dur);
-    const e = ease(m.t);
-    const x = m.from.x + (n.x - m.from.x) * e, z = m.from.z + (n.z - m.from.z) * e;
-    const g = groundAt(x, z, m.from.g + (n.groundY - m.from.g) * e);
-    pos.set(x, g + EYE, z);
-    const k = 1 - Math.pow(0.0015, dt);
-    view.yaw += wrap((m.t < 0.55 ? m.yawTravel : m.yaw1) - view.yaw) * k;
-    view.pitch += (PITCH0 - view.pitch) * k;
-    if (m.t >= 1) {
-      current = m.to; moving = null;
-      if (queue.length) startNext(); else { settleYaw = m.yaw1; onArrive(); }
+    const s = easeSine(m.t);
+    const p = m.curve.getPointAt(s);
+    pos.set(p.x, groundAt(p.x, p.z, p.y) + EYE, p.z);
+    // look along the path (smoothed look-ahead), then settle on the stop's best view
+    const ahead = m.curve.getPointAt(Math.min(1, s + 1.6 / m.L));
+    if (Math.hypot(ahead.x - p.x, ahead.z - p.z) > 0.35) {
+      m.ty += wrap(angleTo(p.x, p.z, ahead.x, ahead.z) - m.ty) * (1 - Math.exp(-dt * 3));
     }
-    dirty = true;
-  } else if (settleYaw !== null) {
-    const d = wrap(settleYaw - view.yaw);
-    view.yaw += d * (1 - Math.pow(0.003, dt));
-    if (Math.abs(d) < 0.002) settleYaw = null;
+    const a = Math.min(0.4, 1.6 / m.dur), b = Math.min(0.55, 2.2 / m.dur);
+    view.yaw = mixAng(mixAng(m.y0, m.ty, smooth(0, a, m.t)), m.y1, smooth(1 - b, 1, m.t));
+    view.pitch = mix(m.p0, PITCH0, smooth(0, a, m.t));
+    while (m.passed < m.marks.length && s >= m.marks[m.passed].u) { current = m.marks[m.passed].i; onPass(); m.passed++; }
+    if (m.t >= 1) {
+      current = m.to; moving = null; view.yaw = m.y1;
+      onArrive();
+      if (autoTour) { auto.t = 0; auto.dur = 5.5; auto.base = view.yaw; }
+    }
     dirty = true;
   }
   if (!dragging && (Math.abs(spin.v) > 0.003 || Math.abs(spin.p) > 0.003)) {
@@ -1565,8 +1574,20 @@ function update(dt) {
     dirty = true;
   }
   if (autoTour && !moving && !dragging) {
-    autoTimer += dt; view.yaw += dt * 0.08; dirty = true;
-    if (autoTimer > 3.6) { autoTimer = 0; if (current < NODES.length - 1) goTo(current + 1); else setAuto(false); }
+    // slow look left and right, starting and ending at rest, then walk on
+    auto.t += dt;
+    const k = Math.min(1, auto.t / auto.dur), amp = auto.dur > 3 ? 0.38 : 0;
+    view.yaw = auto.base + amp * Math.sin(2 * Math.PI * k) * Math.sin(Math.PI * k);
+    view.pitch = mix(view.pitch, PITCH0, 1 - Math.exp(-dt * 2));
+    dirty = true;
+    if (k >= 1) { if (current < NODES.length - 1) goTo(current + 1); else setAuto(false); }
+  }
+  // fade the floor arrows in
+  if (arrowGroup.visible && arrowFade < 1) {
+    arrowFade = Math.min(1, arrowFade + dt / 0.5);
+    const f = smooth(0, 1, arrowFade);
+    arrowMat.opacity = 0.92 * f; arrowShadowMat.opacity = 0.25 * f; discMat.opacity = 0.25 * f; discRingMat.opacity = 0.8 * f;
+    dirty = true;
   }
 }
 
@@ -1583,7 +1604,7 @@ const arrowGeo = (() => {
   s.moveTo(0, 0.34); s.lineTo(0.34, -0.02); s.lineTo(0.22, -0.12); s.lineTo(0, 0.1); s.lineTo(-0.22, -0.12); s.lineTo(-0.34, -0.02); s.closePath();
   const g = new T.ShapeGeometry(s); g.rotateX(-Math.PI / 2); return g;
 })();
-let hotspots = [];
+let hotspots = [], arrowFade = 0;
 const discs = [];
 function buildDiscs() {
   const dg = new T.CircleGeometry(0.22, 40); dg.rotateX(-Math.PI / 2);
@@ -1596,10 +1617,12 @@ function buildDiscs() {
     scene.add(g); discs.push(g);
   });
 }
-function hideArrows() { arrowGroup.visible = false; }
+function hideArrows() { arrowGroup.visible = false; discs.forEach((d) => { d.visible = false; }); }
 function showArrows() {
   arrowGroup.clear(); hotspots = [];
+  if (autoTour) { hideArrows(); return; }
   const n = NODES[current];
+  arrowFade = 0; arrowMat.opacity = arrowShadowMat.opacity = discMat.opacity = discRingMat.opacity = 0;
   neighbours(current).forEach((j) => {
     const m = NODES[j], a = angleTo(n.x, n.z, m.x, m.z);
     const slope = (m.groundY - n.groundY) / Math.max(0.5, Math.hypot(m.x - n.x, m.z - n.z));
@@ -1634,13 +1657,22 @@ const stepEls = NODES.map((n, i) => {
   elSteps.appendChild(b); return b;
 });
 let shownName = '';
+function showName(n) {
+  if (n.name === shownName) return;
+  shownName = n.name;
+  elName.classList.add('is-fading');
+  setTimeout(() => { elName.textContent = shownName; elName.classList.remove('is-fading'); }, 260);
+}
+function onPass() {
+  const n = NODES[current];
+  showName(n);
+  elFloor.textContent = n.f ? 'First floor' : 'Ground floor';
+  stepEls.forEach((b, i) => b.classList.toggle('is-active', i === current));
+  if (mapFloor !== n.f) { mapFloor = n.f; updateTabs(); }
+}
 function onArrive() {
   const n = NODES[current];
-  if (n.name !== shownName) {
-    shownName = n.name;
-    elName.classList.add('is-fading');
-    setTimeout(() => { elName.textContent = n.name; elName.classList.remove('is-fading'); }, 180);
-  }
+  showName(n);
   elFloor.textContent = n.f ? 'First floor' : 'Ground floor';
   stepEls.forEach((b, i) => b.classList.toggle('is-active', i === current));
   btnPrev.disabled = current === 0;
@@ -1650,10 +1682,15 @@ function onArrive() {
   mapFloor = n.f; updateTabs();
   showArrows();
 }
-btnPrev.addEventListener('click', () => { setAuto(false); if (current > 0) goTo((moving ? moving.to : current) - 1); });
-btnNext.addEventListener('click', () => { setAuto(false); if (current < NODES.length - 1) goTo((moving ? moving.to : current) + 1); });
-function setAuto(on) { autoTour = on; autoTimer = on ? 2.4 : 0; btnPlay.classList.toggle('is-on', on); }
-btnPlay.addEventListener('click', () => { if (!autoTour && current === NODES.length - 1) goTo(0); setAuto(!autoTour); });
+btnPrev.addEventListener('click', () => { setAuto(false); const c = moving ? moving.to : current; if (c > 0) goTo(c - 1); });
+btnNext.addEventListener('click', () => { setAuto(false); const c = moving ? moving.to : current; if (c < NODES.length - 1) goTo(c + 1); });
+function setAuto(on) {
+  if (on === autoTour) return;
+  autoTour = on; btnPlay.classList.toggle('is-on', on);
+  if (on) { auto.t = 0; auto.dur = 1.2; auto.base = view.yaw; hideArrows(); }
+  else if (!moving) showArrows();
+}
+btnPlay.addEventListener('click', () => { const on = !autoTour; setAuto(on); if (on && current === NODES.length - 1 && !moving) goTo(0); });
 photoBtn.addEventListener('click', () => {
   const n = NODES[current]; if (!n.photo) return;
   setAuto(false);
@@ -1784,7 +1821,6 @@ canvas.addEventListener('pointermove', (e) => {
   view.yaw -= dx * k; view.pitch = Math.max(-1.25, Math.min(1.25, view.pitch + dy * k));
   const now = performance.now(), dtm = Math.max(1, now - lastMove.t) / 1000;
   lastMove = { t: now, vx: mix(lastMove.vx, -dx * k / dtm, 0.5), vy: mix(lastMove.vy, dy * k / dtm, 0.5) };
-  settleYaw = null;
   if (downInfo && downInfo.moved > 6) setAuto(false);
   dirty = true;
 });
@@ -1818,7 +1854,7 @@ function onTap(cx, cy) {
 // ------------------------------------------------------------------
 // Render: fast pass while moving, HQ (GTAO + bloom) when still
 // ------------------------------------------------------------------
-let composer, gtao, bloom, fastBloom = true;
+let composer, gtao, bloom;
 function setupComposer() {
   const rt = new T.WebGLRenderTarget(1, 1, { type: T.HalfFloatType, samples: 4 });
   composer = new EffectComposer(renderer, rt);
@@ -1833,7 +1869,7 @@ function setupComposer() {
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 }
-let hqActive = false, stillSince = 0, hqDone = false;
+let ao = 1, bloomOn = true, frameAvg = 1 / 60, last = performance.now(), mapTick = 0;
 function setRes(scale) {
   const w = window.innerWidth, h = window.innerHeight;
   const pr = DPR_MAX * scale;
@@ -1845,40 +1881,38 @@ function resize() {
   camera.aspect = w / h;
   if (w < h) view.fov = Math.max(view.fov, 82);
   camera.updateProjectionMatrix();
-  setRes(hqActive ? 1 : dprScale);
+  setRes(dprScale);
   resizeMap(); dirty = true;
 }
 window.addEventListener('resize', resize);
-
-let frameAvg = 1 / 60, last = performance.now(), mapTick = 0, motionFrames = 0;
-function renderFast() {
-  if (hqActive) { hqActive = false; setRes(dprScale); }
-  gtao.enabled = false; bloom.enabled = fastBloom;
-  composer.render();
+/** adapt resolution between walks (never mid-motion, so nothing pops) */
+function adaptResolution() {
+  if (frameAvg > 1 / 45 && dprScale > 0.55) { dprScale = Math.max(0.55, dprScale - 0.1); setRes(dprScale); }
+  else if (frameAvg > 1 / 45) bloomOn = false;
+  else if (frameAvg < 1 / 100 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.05); setRes(dprScale); }
 }
-function renderHQ() {
-  if (!hqActive) { hqActive = true; setRes(1); }
-  gtao.enabled = true; bloom.enabled = true;
+function render() {
+  gtao.enabled = ao > 0.005;
+  gtao.blendIntensity = smooth(0, 1, ao);
+  bloom.enabled = bloomOn;
   composer.render();
 }
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   update(dt);
+  // ambient occlusion fades out while walking / dragging and back in when still
+  const aoTarget = moving || dragging ? 0 : 1;
+  if (ao !== aoTarget) {
+    ao = aoTarget ? Math.min(1, ao + dt / 0.7) : Math.max(0, ao - dt / 0.3);
+    dirty = true;
+  }
   if (dirty) {
     applyCamera();
-    renderFast();
-    // adaptive resolution: hold the display rate (60 / 90 / 120 Hz)
-    frameAvg = mix(frameAvg, dt, 0.08); motionFrames++;
-    if (motionFrames > 20 && motionFrames % 15 === 0) {
-      if (frameAvg > 1 / 50 && dprScale > 0.55) { dprScale = Math.max(0.55, dprScale - 0.1); setRes(dprScale); }
-      else if (frameAvg > 1 / 40) fastBloom = false;
-      else if (frameAvg < 1 / 100 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.05); setRes(dprScale); }
-    }
+    render();
+    if (moving && ao === 0) frameAvg = mix(frameAvg, dt, 0.05);
     mapTick += dt;
     if (mapTick > 0.05 || !moving) { drawMap(); mapTick = 0; }
-    dirty = false; stillSince = now; hqDone = false;
-  } else if (!hqDone && !moving && !dragging && now - stillSince > 140) {
-    renderHQ(); hqDone = true; motionFrames = 0;
+    dirty = false;
   }
   requestAnimationFrame(loop);
 }
@@ -1900,14 +1934,15 @@ async function boot() {
   floors[0].visible = floors[1].visible = true;
   renderer.shadowMap.needsUpdate = true;
   applyCamera();
-  renderHQ(); hqDone = true;
+  render();
   onArrive();
   requestAnimationFrame(loop);
   introBtn.disabled = false; introBtn.textContent = 'Enter the showroom';
   window.__showroom = {
     goTo, NODES, view,
-    jump(i) { queue = []; moving = null; current = i; const n = NODES[i]; pos.set(n.x, n.y, n.z); view.yaw = n.yaw * Math.PI / 180; view.pitch = PITCH0; settleYaw = null; onArrive(); dirty = true; },
-    state: () => ({ current, moving: !!moving, hq: hqDone, dpr: renderer.getPixelRatio() }),
+    jump(i) { moving = null; current = i; const n = NODES[i]; pos.set(n.x, n.y, n.z); view.yaw = n.yaw * Math.PI / 180; view.pitch = PITCH0; ao = 1; onArrive(); dirty = true; },
+    setAuto,
+    state: () => ({ current, moving: !!moving, hq: ao >= 1 && !dirty, auto: autoTour, yaw: view.yaw, x: pos.x, z: pos.z, dpr: renderer.getPixelRatio() }),
     render: () => { dirty = true; },
     info: () => renderer.info.render
   };
